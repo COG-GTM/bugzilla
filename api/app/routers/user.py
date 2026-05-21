@@ -493,13 +493,18 @@ def create_user(
     password = body.password.strip() if body.password else "*"
     realname = body.full_name.strip() if body.full_name else ""
 
-    # Hash password if a real password was provided
+    # Hash password using Bugzilla's bz_crypt format (salt,b64digest{SHA-256})
     cryptpassword = password
     if password != "*":
-        from passlib.context import CryptContext
+        import base64
+        import hashlib
 
-        ctx = CryptContext(schemes=["bcrypt"])
-        cryptpassword = ctx.hash(password)
+        salt = secrets.token_urlsafe(8)[:8]
+        h = hashlib.sha256()
+        h.update(password.encode("utf-8"))
+        h.update(salt.encode("utf-8"))
+        digest = base64.b64encode(h.digest()).decode("utf-8").rstrip("=")
+        cryptpassword = f"{salt},{digest}{{SHA-256}}"
 
     new_user = Profile(
         login_name=email,
