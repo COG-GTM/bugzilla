@@ -22,8 +22,10 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        from urllib.parse import quote_plus
+
         return (
-            f"mysql+{self.bz_db_driver}://{self.bz_db_user}:{self.bz_db_pass}"
+            f"mysql+{self.bz_db_driver}://{quote_plus(self.bz_db_user)}:{quote_plus(self.bz_db_pass)}"
             f"@{self.bz_db_host}:{self.bz_db_port}/{self.bz_db_name}"
         )
 

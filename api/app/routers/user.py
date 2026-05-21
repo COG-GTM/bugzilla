@@ -255,7 +255,7 @@ def _filter_users_by_group(
             g = db.execute(stmt).scalar_one_or_none()
             if g is None:
                 raise BugzillaApiError("invalid_group_name", f"No group named '{gname}'.")
-            if current_user is not None and not user_in_group(current_user, gname):
+            if current_user is None or not user_in_group(current_user, gname):
                 raise BugzillaApiError("invalid_group_name", f"No group named '{gname}'.")
             groups[g.id] = g
 

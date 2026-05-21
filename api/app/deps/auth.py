@@ -31,7 +31,6 @@ def _verify_password(plain: str, hashed: str) -> bool:
     This mirrors ``bz_crypt`` from ``Bugzilla/Util.pm`` (lines 683-730).
     """
     import base64
-    import crypt as _crypt
     import hashlib
     import re
 
@@ -53,6 +52,8 @@ def _verify_password(plain: str, hashed: str) -> bool:
         return computed == stored_digest
 
     try:
+        import crypt as _crypt
+
         return _crypt.crypt(plain, hashed) == hashed
     except Exception:
         return False
