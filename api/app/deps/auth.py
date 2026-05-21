@@ -24,14 +24,36 @@ from app.models.user import LoginCookie, Profile
 def _verify_password(plain: str, hashed: str) -> bool:
     """Check a plain-text password against the stored crypt hash.
 
-    Bugzilla stores passwords using crypt() with various schemes.
-    For this port we use passlib which auto-detects the scheme.
-    """
-    from passlib.context import CryptContext
+    Bugzilla stores passwords in several formats:
+      - Modern: ``salt,b64digest{ALGORITHM}`` (e.g. SHA-256)
+      - Legacy: standard crypt() output (des/md5/sha/bcrypt)
 
-    ctx = CryptContext(schemes=["bcrypt", "des_crypt", "md5_crypt", "sha256_crypt", "sha512_crypt"])
+    This mirrors ``bz_crypt`` from ``Bugzilla/Util.pm`` (lines 683-730).
+    """
+    import base64
+    import crypt as _crypt
+    import hashlib
+    import re
+
+    m = re.search(r"\{([^}]+)\}$", hashed)
+    if m:
+        algorithm = m.group(1)
+        prefix = hashed[: m.start()]
+        salt, _, stored_digest = prefix.partition(",")
+        if not stored_digest:
+            return False
+        algo_map = {"SHA-256": "sha256", "SHA-512": "sha512"}
+        hash_name = algo_map.get(algorithm)
+        if hash_name is None:
+            return False
+        h = hashlib.new(hash_name)
+        h.update(plain.encode("utf-8"))
+        h.update(salt.encode("utf-8"))
+        computed = base64.b64encode(h.digest()).decode("utf-8").rstrip("=")
+        return computed == stored_digest
+
     try:
-        return ctx.verify(plain, hashed)
+        return _crypt.crypt(plain, hashed) == hashed
     except Exception:
         return False
 
