@@ -28,6 +28,8 @@ class Profile(Base):
 
     group_memberships = relationship("UserGroupMap", back_populates="user", lazy="selectin")
     login_cookies = relationship("LoginCookie", back_populates="user", lazy="selectin")
+    saved_searches = relationship("NamedQuery", back_populates="user", lazy="selectin")
+    saved_reports = relationship("Report", back_populates="user", lazy="selectin")
 
     @property
     def login(self) -> str:
@@ -105,3 +107,33 @@ class Token(Base):
     issuedate = Column(DateTime, nullable=False)
     tokentype = Column(String(16), nullable=False)
     eventdata = Column(String(255), nullable=True)
+
+
+class NamedQuery(Base):
+    """Maps to ``namedqueries`` — saved searches."""
+
+    __tablename__ = "namedqueries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    userid = Column(
+        Integer, ForeignKey("profiles.userid", ondelete="CASCADE"), nullable=False
+    )
+    name = Column(String(64), nullable=False)
+    query = Column(Text, nullable=False)
+
+    user = relationship("Profile", back_populates="saved_searches")
+
+
+class Report(Base):
+    """Maps to ``reports`` — saved reports."""
+
+    __tablename__ = "reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(
+        Integer, ForeignKey("profiles.userid", ondelete="CASCADE"), nullable=False
+    )
+    name = Column(String(64), nullable=False)
+    query = Column(Text, nullable=False)
+
+    user = relationship("Profile", back_populates="saved_reports")
