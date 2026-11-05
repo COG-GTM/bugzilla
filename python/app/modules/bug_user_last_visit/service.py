@@ -32,7 +32,7 @@ def ids_param(ctx: Ctx, path_id: str) -> list:
     ids = ctx.params["ids"]
     if not isinstance(ids, list):
         ids = [ids]
-    if any(isinstance(v, (list, dict)) for v in ids):
+    if any(isinstance(v, (list, dict, bool)) for v in ids):  # JSON booleans are refs in Perl too
         raise BugzillaError("param_scalar_array_required",
                             "The ids parameter must be an array of scalars (integers and/or strings).")
     return ids

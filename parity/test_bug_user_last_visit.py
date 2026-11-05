@@ -234,3 +234,15 @@ def test_get_collection_path_is_not_a_resource(api, user_token):
 def test_get_non_numeric_path_is_not_a_resource(api, user_token):
     expect_error(api.get("/bug_user_last_visit/seed-01", token=user_token), 404, 32614,
                  "A REST API resource was not found for 'GET /bug_user_last_visit/seed-01'.")
+
+
+def test_update_boolean_ids_are_not_scalars(api, user_token, involved_bug):
+    # JSON booleans decode to JSON::PP::Boolean references in Perl, so validate() rejects them
+    expect_error(api.post(f"/bug_user_last_visit/{involved_bug}", token=user_token, json={"ids": [True]}),
+                 400, 58, "The ids parameter must be an array of scalars (integers and/or strings).")
+
+
+def test_non_decimal_digit_path_is_not_a_resource(api, user_token):
+    # Perl's \d+ does not match U+00B2 (superscript two)
+    expect_error(api.get("/bug_user_last_visit/\u00b2", token=user_token), 404, 32614)
+    expect_error(api.post("/bug_user_last_visit/\u00b2", token=user_token), 404, 32614)

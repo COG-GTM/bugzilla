@@ -13,7 +13,7 @@ ERR = {"4XX": {"model": schemas.ErrorEnvelope}}
 
 
 def numeric(ctx: Ctx, bug_id: str) -> str:
-    if not bug_id.isdigit():
+    if not bug_id.isdecimal():  # Perl \d+ (Unicode Nd), unlike str.isdigit()
         raise rest_resource_not_found(ctx.request.method, f"/bug_user_last_visit/{bug_id}")
     return bug_id
 
