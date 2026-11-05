@@ -2,7 +2,6 @@
 from pydantic import BaseModel, Field
 
 
-
 class LastVisit(BaseModel):
     id: int = Field(description="bug id")
     last_visit_ts: str = Field(description="Bugzilla dateTime, e.g. 2026-11-05T13:29:39Z")

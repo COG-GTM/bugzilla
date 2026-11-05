@@ -7,9 +7,10 @@ from fastapi import APIRouter, Depends
 from app.core.errors import rest_resource_not_found
 from app.core.rest import Ctx, context, json_response
 from app.modules.bug_user_last_visit import schemas, service
+from app.modules.bug.schemas import ErrorEnvelope
 
 router = APIRouter(tags=["BugUserLastVisit"])
-ERR = {"4XX": {"model": schemas.ErrorEnvelope}}
+ERR = {"4XX": {"model": ErrorEnvelope}}
 
 
 def numeric(ctx: Ctx, bug_id: str) -> str:
