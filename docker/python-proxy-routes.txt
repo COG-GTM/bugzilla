@@ -1,0 +1,5 @@
+# REST path prefixes (regex alternatives, relative to /rest.cgi/) served by the Python service.
+# One entry per migrated WebService module; docker/startup.sh turns each line into a ProxyPassMatch.
+# Bug module (Bugzilla::WebService::Bug)
+bug
+field/bug

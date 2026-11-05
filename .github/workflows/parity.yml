@@ -19,7 +19,7 @@ jobs:
           python-version: "3.12"
 
       - name: Start Bugzilla (docker compose)
-        run: docker compose up -d --build
+        run: docker compose up -d --build bugzilla5.web bugzilla5.db
 
       - name: Wait for checksetup
         run: |
