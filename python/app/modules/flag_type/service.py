@@ -216,7 +216,7 @@ def process_lists(ctx: Ctx, items) -> list[tuple[int, int]]:
         if isinstance(item, dict):
             continue
         if isinstance(item, list):
-            raise BugzillaError("param_invalid", f"ARRAY is not a valid parameter for the function.")
+            raise BugzillaError("param_invalid", "ARRAY is not a valid parameter for the function.")
         product = check_product(ctx, item)
         if allowed is not None and product["id"] not in allowed:
             raise product_access_denied(item)

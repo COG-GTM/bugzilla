@@ -1,7 +1,6 @@
 """Pydantic models documenting the BugUserLastVisit REST contract (Bugzilla::WebService::BugUserLastVisit)."""
 from pydantic import BaseModel, Field
 
-from app.modules.bug.schemas import ErrorEnvelope  # noqa: F401  (shared error envelope)
 
 
 class LastVisit(BaseModel):

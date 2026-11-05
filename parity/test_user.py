@@ -23,7 +23,8 @@ def unique_email(prefix="parity-user"):
 
 
 def group_names(user):
-    return [g["name"] for g in user["groups"]]
+    # other parity modules (Group) create "parity_group_*" groups whose user_regexp can match seeded users
+    return [g["name"] for g in user["groups"] if not g["name"].lower().startswith("parity_group")]
 
 
 @pytest.fixture(scope="module")
@@ -142,8 +143,8 @@ def test_admin_sees_editusers_fields_and_all_groups(api, admin_token):
     assert user["id"] == 1 and user["name"] == user["email"] == ADMIN_LOGIN
     assert user["can_login"] is True and user["email_enabled"] is True and user["login_denied_text"] == ""
     assert user["saved_searches"] == [] and user["saved_reports"] == []
-    names = group_names(user)
-    assert names == sorted(names) and {"admin", "editusers", "editbugs", "canconfirm"} <= set(names)
+    names = [g["name"] for g in user["groups"]]
+    assert names == sorted(names, key=str.lower) and {"admin", "editusers", "editbugs", "canconfirm"} <= set(names)
     assert all(set(g) == GROUP_KEYS for g in user["groups"])
     admin_group = next(g for g in user["groups"] if g["name"] == "admin")
     assert admin_group == {"id": 1, "name": "admin", "description": "Administrators"}

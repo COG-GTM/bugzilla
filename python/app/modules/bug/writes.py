@@ -510,6 +510,29 @@ def update(ctx: Ctx, ids=None) -> dict:
     return {"bugs": [_update_one(ctx, row, dict(p)) for row in rows]}
 
 
+def involved_user_ids(db: Session, bug_id: int) -> set[int]:
+    """Bugzilla::User::is_involved_in_bug: reporter, assignee, QA contact or on the CC list."""
+    row = db.execute(text("SELECT reporter, assigned_to, qa_contact FROM bugs WHERE bug_id = :b"), {"b": bug_id}).first()
+    ids = {row.reporter, row.assigned_to, row.qa_contact} - {None}
+    ids.update(r[0] for r in db.execute(text("SELECT who FROM cc WHERE bug_id = :b"), {"b": bug_id}))
+    return ids
+
+
+def sync_last_visits(db: Session, bug_id: int, user: User, ts) -> None:
+    """Bugzilla::Bug::update side effect: upsert the updater's bug_user_last_visit row when involved and drop
+    rows of users no longer involved with the bug."""
+    involved = involved_user_ids(db, bug_id)
+    if user.id in involved:
+        updated = db.execute(text("UPDATE bug_user_last_visit SET last_visit_ts = :ts WHERE bug_id = :b AND user_id = :u"),
+                             {"ts": ts, "b": bug_id, "u": user.id}).rowcount
+        if not updated:
+            db.execute(text("INSERT INTO bug_user_last_visit (bug_id, user_id, last_visit_ts) VALUES (:b, :u, :ts)"),
+                       {"b": bug_id, "u": user.id, "ts": ts})
+    for (uid,) in list(db.execute(text("SELECT user_id FROM bug_user_last_visit WHERE bug_id = :b"), {"b": bug_id})):
+        if uid not in involved:
+            db.execute(text("DELETE FROM bug_user_last_visit WHERE bug_id = :b AND user_id = :u"), {"b": bug_id, "u": uid})
+
+
 def _update_one(ctx: Ctx, row, p: dict) -> dict:
     db, user = ctx.db, ctx.user
     bug_id = row["bug_id"]
@@ -743,6 +766,7 @@ def _update_one(ctx: Ctx, row, p: dict) -> dict:
         delta_ts = ts
     else:
         delta_ts = row["delta_ts"]
+    sync_last_visits(db, bug_id, user, delta_ts)
     return {"id": bug_id, "alias": aliases_of(db, bug_id), "last_change_time": iso_z(delta_ts),
             "changes": {API_NAME.get(k, k): {"removed": v[0], "added": v[1]} for k, v in changes.items()}}
 

@@ -34,7 +34,7 @@ def param_required(param: str, function: str | None = None) -> BugzillaError:
 
 def params_required(function: str, params: list[str]) -> BugzillaError:
     return BugzillaError("params_required",
-                         f"{function} requires one of the following parameters: {', '.join(params)}")
+                         f"The function {function} requires that you set one of the following parameters: {', '.join(params)}")
 
 
 def login_required() -> BugzillaError:
