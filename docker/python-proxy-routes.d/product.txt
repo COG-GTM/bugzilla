@@ -1,0 +1,4 @@
+product
+product_selectable
+product_enterable
+product_accessible
