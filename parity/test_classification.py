@@ -155,7 +155,7 @@ def test_get_by_id_anonymous_default_fields(api):
 def test_products_are_sorted_by_name(api):
     (cls,) = _classification(api, "Unclassified")
     names = [p["name"] for p in cls["products"]]
-    assert names == sorted(names) and len(set(names)) == len(names)
+    assert names == sorted(names, key=str.lower) and len(set(names)) == len(names)
 
 
 def test_get_by_name_equals_get_by_id(api):
