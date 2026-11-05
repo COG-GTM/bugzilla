@@ -32,3 +32,13 @@ def test_ids_times_tokens_and_identity():
     assert out == {"bug_id": "<id>", "cc": ["a", "b"], "creator": "<admin-email>", "id": "<id>",
                    "message": "Bug #<n> by <run>", "time": "<datetime>", "token": "<token>",
                    "update_token": "<token>"}
+
+
+def test_identity_replacement_is_whole_token_only():
+    out = normalize(
+        {"creator": "parity.user@bugzilla.test", "assigned_to": "user@bugzilla.test",
+         "message": "There is no user named 'user@bugzilla.test'."},
+        replacements={"user@bugzilla.test": "<admin-email>"},
+    )
+    assert out == {"assigned_to": "<admin-email>", "creator": "parity.user@bugzilla.test",
+                   "message": "There is no user named '<admin-email>'."}

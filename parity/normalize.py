@@ -103,7 +103,9 @@ def normalize(
             value = value.replace(run_id, RUN_PLACEHOLDER)
         for literal, placeholder in (replacements or {}).items():
             if literal:
-                value = value.replace(literal, placeholder)
+                # Whole-token only, so an admin login that is a suffix of another address
+                # (user@x vs parity.user@x) does not rewrite that other identity.
+                value = re.sub(rf"(?<![A-Za-z0-9._%+-]){re.escape(literal)}(?![A-Za-z0-9._%+-])", placeholder, value)
         if key == "message":
             # Error messages embed ids chosen at run time ("Bug #1234 does not exist",
             # "Bug 17 has already taken the alias ...").
