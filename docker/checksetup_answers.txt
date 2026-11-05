@@ -37,3 +37,4 @@ $answer{'db_mysql_ssl_ca_file'}     = '';
 $answer{'db_mysql_ssl_ca_path'}     = '';
 $answer{'db_mysql_ssl_client_cert'} = '';
 $answer{'db_mysql_ssl_client_key'}  = '';
+$answer{'mail_delivery_method'} = 'Test';
