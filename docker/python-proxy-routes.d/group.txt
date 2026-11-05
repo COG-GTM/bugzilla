@@ -1,0 +1,2 @@
+# Group module (Bugzilla::WebService::Group): REST path prefixes (regex, relative to /rest.cgi/) served by Python.
+group
