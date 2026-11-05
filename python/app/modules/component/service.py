@@ -56,7 +56,7 @@ def perl_true(value) -> bool:
         return value != 0
     if isinstance(value, str):
         return value not in ("", "0")
-    return bool(value)
+    return True  # JSON arrays/objects arrive as Perl references, which are always true (even when empty)
 
 
 def trim(value):
@@ -181,6 +181,11 @@ def _check_description(value) -> str:
 
 
 def _check_cc_list(db: Session, cc_list) -> list[int]:
+    # ``foreach my $cc (@$cc_list)``: undef autovivifies to an empty array, a hash ref or a scalar die
+    if cc_list is None:
+        cc_list = []
+    if isinstance(cc_list, dict):
+        raise PerlDie("Not an ARRAY reference at /var/www/html/Bugzilla/Component.pm line 237.\n", 201)
     if not isinstance(cc_list, list):
         raise PerlDie(f'Can\'t use string ("{cc_list}") as an ARRAY ref while "strict refs" in use at '
                       "/var/www/html/Bugzilla/Component.pm line 237.\n", 201)

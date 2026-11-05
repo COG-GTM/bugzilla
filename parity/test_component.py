@@ -90,9 +90,10 @@ def test_create_is_open_false_makes_component_inactive(api, admin_token, comp_pr
     assert component_flags(api, admin_token)[b["name"]] is False
 
 
-@pytest.mark.parametrize("value,active", [("0", False), (None, False), ("false", True), (1, True), ("", False)])
+@pytest.mark.parametrize("value,active", [("0", False), (None, False), ("false", True), (1, True), ("", False),
+                                          ([], True), ({}, True)])
 def test_create_is_open_uses_perl_truthiness(api, admin_token, value, active):
-    # Perl: "0", "", undef are false; any other string (even "false") is true
+    # Perl: "0", "", undef are false; any other string (even "false") and any reference (even []/{}) are true
     b = body(is_open=value)
     ok(api.post("/component", token=admin_token, json=b), 201)
     assert component_flags(api, admin_token)[b["name"]] is active
@@ -135,8 +136,13 @@ def test_create_with_create_series_flag(api, admin_token):
     ok(api.post("/component", token=admin_token, json=body(create_series=1)), 201)
 
 
-def test_create_with_empty_default_cc(api, admin_token):
-    ok(api.post("/component", token=admin_token, json=body(default_cc=[])), 201)
+@pytest.mark.parametrize("cc", [[], None])
+def test_create_with_empty_or_null_default_cc(api, admin_token, cc):
+    # foreach (@$undef) autovivifies, so null behaves like []
+    b = body(default_cc=cc)
+    ok(api.post("/component", token=admin_token, json=b), 201)
+    bug_id = ok(bug_in(api, admin_token, b["name"]))["id"]
+    assert ok(api.get(f"/bug/{bug_id}", token=admin_token, params={"include_fields": "cc"}))["bugs"][0]["cc"] == []
 
 
 def test_create_with_login_password_in_query(api):
@@ -261,6 +267,14 @@ def test_create_default_cc_must_be_a_list(api, admin_token):
     assert set(err) == {"error", "code", "message", "documentation"} and err["error"] is True
     assert err["code"] == 100500
     assert err["message"].startswith(f'Can\'t use string ("{CC[0]}") as an ARRAY ref')
+
+
+def test_create_default_cc_object_is_not_an_array_reference(api, admin_token):
+    r = api.post("/component", token=admin_token, json=body(default_cc={"a": 1}))
+    assert r.status_code == 201, r.text
+    err = r.json()
+    assert err["error"] is True and err["code"] == 100500
+    assert err["message"].startswith("Not an ARRAY reference")
 
 
 # ----------------------------------------------------------------------------- unknown params
