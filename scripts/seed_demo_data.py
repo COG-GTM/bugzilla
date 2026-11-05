@@ -23,7 +23,8 @@ import urllib.parse
 import urllib.request
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8080/rest.cgi"
-USER_PASSWORD = "DemoPassw0rd!"
+# Demo-only accounts. Override for anything that is not a throwaway local instance.
+USER_PASSWORD = os.environ.get("BZ_SEED_USER_PASSWORD", "DemoPassw0rd!")
 
 PRODUCTS = [
     {
@@ -203,7 +204,12 @@ class Client:
     def call(self, method, path, params=None, body=None):
         params = dict(params or {})
         if self.token:
-            params["token"] = self.token
+            # Bugzilla 5.2 only reads credentials from the query string or the
+            # JSON body; keep the token out of the URL whenever there is a body.
+            if body is not None:
+                body = {**body, "token": self.token}
+            else:
+                params["token"] = self.token
         url = f"{self.base_url}{path}"
         if params:
             url += "?" + urllib.parse.urlencode(params, doseq=True)
@@ -293,7 +299,7 @@ def ensure_products(admin):
 
 def find_bug(client, alias):
     try:
-        bugs = client.get(f"/bug/{alias}", include_fields="id,alias,status,resolution,cc,depends_on")["bugs"]
+        bugs = client.get(f"/bug/{alias}", include_fields="id,alias,status,resolution,depends_on")["bugs"]
     except BugzillaError as exc:
         if exc.code in (100, 101):
             return None
@@ -309,12 +315,45 @@ def ensure_bugs(base_url, admin):
             sessions[email] = login(base_url, email, USER_PASSWORD)
         return sessions[email]
 
+    def apply_status(spec, bug_id, current_status):
+        """Walk the status path, skipping steps the bug has already reached."""
+        reached = current_status == spec["status"]
+        for status, needs_resolution in STATUS_PATH[spec["status"]]:
+            if reached:
+                break
+            if status == current_status:
+                continue
+            change = {"status": status}
+            if needs_resolution:
+                change["resolution"] = spec["resolution"]
+                if spec.get("dupe_of"):
+                    change["dupe_of"] = ids[spec["dupe_of"]]
+            as_user(spec["assigned_to"]).put(f"/bug/{bug_id}", change)
+            current_status = status
+
+    def reconcile(spec, existing):
+        """Finish a bug that an earlier, interrupted run left half-seeded."""
+        bug_id = existing["id"]
+        have = admin.get(f"/bug/{bug_id}/comment", include_fields="text")["bugs"][str(bug_id)]["comments"]
+        have_text = {c["text"] for c in have}
+        fixed = 0
+        for author, text in spec["comments"]:
+            if text not in have_text:
+                as_user(author).post(f"/bug/{bug_id}/comment", {"comment": text})
+                fixed += 1
+        if existing["status"] != spec["status"]:
+            apply_status(spec, bug_id, existing["status"])
+            fixed += 1
+        return fixed
+
     ids = {}
-    created = 0
+    created = repaired = 0
+    pending = []
     for spec in BUGS:
         existing = find_bug(admin, spec["alias"])
         if existing:
             ids[spec["alias"]] = existing["id"]
+            pending.append((spec, existing))
             continue
         product = next(p for p in PRODUCTS if p["name"] == spec["product"])
         reporter_name = dict(USERS)[spec["reporter"]]
@@ -335,15 +374,13 @@ def ensure_bugs(base_url, admin):
         for author, text in spec["comments"]:
             as_user(author).post(f"/bug/{bug_id}/comment", {"comment": text})
 
-        for status, needs_resolution in STATUS_PATH[spec["status"]]:
-            change = {"status": status}
-            if needs_resolution:
-                change["resolution"] = spec["resolution"]
-                if spec.get("dupe_of"):
-                    change["dupe_of"] = ids[spec["dupe_of"]]
-            as_user(spec["assigned_to"]).put(f"/bug/{bug_id}", change)
+        apply_status(spec, bug_id, "CONFIRMED")
 
-    log(f"bugs: {created} created, {len(BUGS) - created} existing")
+    # Reconcile after the create loop so dupe_of targets always have ids.
+    for spec, existing in pending:
+        repaired += 1 if reconcile(spec, existing) else 0
+
+    log(f"bugs: {created} created, {len(BUGS) - created} existing ({repaired} repaired)")
 
     added = 0
     for alias, depends in DEPENDENCIES:
