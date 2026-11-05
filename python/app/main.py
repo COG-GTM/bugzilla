@@ -10,7 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import app.modules as modules_pkg
 from app.core.config import settings
 from app.core.errors import BugzillaError, rest_resource_not_found
-from app.core.rest import error_response
+from app.core.rest import json_response, error_response
 
 log = logging.getLogger("bugzilla")
 
@@ -40,6 +40,13 @@ log.info("modules: %s", MODULES)
 @app.exception_handler(BugzillaError)
 async def bugzilla_error(request: Request, exc: BugzillaError):
     return error_response(request, exc)
+
+
+@app.exception_handler(Exception)
+async def unhandled_error(request: Request, exc: Exception):
+    """Perl wraps any non-Bugzilla exception (e.g. DBD errors) in the error envelope with code 100500."""
+    err = BugzillaError("unknown_error", f"{type(exc).__name__}: {exc}", code=100500)
+    return json_response(request, err.envelope(), 500)
 
 
 @app.exception_handler(StarletteHTTPException)
