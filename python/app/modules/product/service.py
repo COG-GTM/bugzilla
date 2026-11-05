@@ -9,6 +9,8 @@ from app.core.rest import Ctx
 from app.core.util import now_utc
 
 MAX_PRODUCT_SIZE = 64
+CONTROLMAPNA = 0
+CONTROLMAPDEFAULT = 2
 CONTROLMAPMANDATORY = 3
 TYPES = ("accessible", "enterable", "selectable")
 # Product.create / Product.update API field -> products column (Bugzilla::WebService::Product FIELD_MAP)
@@ -53,6 +55,15 @@ def _groups_sql(ctx: Ctx) -> str:
     return ",".join(str(g) for g in gids) if gids else "-1"
 
 
+def _group_clause(ctx: Ctx) -> str:
+    """Tail of the group_control_map join in User::get_selectable/enterable_products.
+    or_groups: the user is in at least one of the controlling groups, or there are none.
+    Otherwise: there must be no controlling group the user is not in."""
+    if param("or_groups"):
+        return f"WHERE (gcm.group_id IN ({_groups_sql(ctx)}) OR gcm.group_id IS NULL)"
+    return f"AND gcm.group_id NOT IN ({_groups_sql(ctx)}) WHERE gcm.group_id IS NULL"
+
+
 def _auth_failure(action: str) -> BugzillaError:
     verb = "add new" if action == "add" else "add, modify or delete"
     return BugzillaError("auth_failure", "Sorry, you aren't a member of the 'editcomponents' group, and so you "
@@ -71,8 +82,7 @@ def selectable_ids(ctx: Ctx) -> list[int]:
     """Products with no MANDATORY group the user is not in, ordered by name (Product LIST_ORDER)."""
     sql = f"""SELECT id FROM products
               LEFT JOIN group_control_map gcm ON gcm.product_id = products.id
-                   AND gcm.membercontrol = {CONTROLMAPMANDATORY} AND gcm.group_id NOT IN ({_groups_sql(ctx)})
-              WHERE gcm.group_id IS NULL ORDER BY products.name"""
+                   AND gcm.membercontrol = {CONTROLMAPMANDATORY} {_group_clause(ctx)} ORDER BY products.name"""
     return [r[0] for r in ctx.db.execute(text(sql))]
 
 
@@ -80,8 +90,7 @@ def enterable_ids(ctx: Ctx) -> list[int]:
     """Active products with Entry access for the user and at least one active component and version."""
     sql = f"""SELECT products.id FROM products
               LEFT JOIN group_control_map gcm ON gcm.product_id = products.id
-                   AND gcm.entry != 0 AND gcm.group_id NOT IN ({_groups_sql(ctx)})
-              WHERE gcm.group_id IS NULL AND products.isactive = 1
+                   AND gcm.entry != 0 {_group_clause(ctx)} AND products.isactive = 1
                 AND products.id IN (SELECT DISTINCT product_id FROM components WHERE isactive = 1)
                 AND products.id IN (SELECT DISTINCT product_id FROM versions WHERE isactive = 1)
               ORDER BY products.name"""
@@ -188,8 +197,8 @@ def _component_to_hash(ctx: Ctx, c) -> dict:
                   prefix="components")
     if f.wants("flag_types", None, "components"):
         types = _flag_types(ctx, c.product_id, c.id)
-        out["flag_types"] = {"bug": [_flag_type_to_hash(ctx, t) for t in types if t.target_type == "bug"],
-                             "attachment": [_flag_type_to_hash(ctx, t) for t in types if t.target_type == "attachment"]}
+        out["flag_types"] = {"bug": [_flag_type_to_hash(t) for t in types if t.target_type == "b"],
+                             "attachment": [_flag_type_to_hash(t) for t in types if t.target_type == "a"]}
     return out
 
 
@@ -206,12 +215,12 @@ def _flag_types(ctx: Ctx, product_id: int, component_id: int):
           AND e.type_id IS NULL ORDER BY flagtypes.sortkey, flagtypes.name""")).all()
 
 
-def _flag_type_to_hash(ctx: Ctx, t) -> dict:
-    return ctx.filter.apply({
-        "id": t.id, "name": t.name, "description": t.description, "cc_list": t.cc_list or "",
-        "sort_key": int(t.sortkey), "is_active": bool(t.is_active), "is_requestable": bool(t.is_requestable),
-        "is_requesteeble": bool(t.is_requesteeble), "is_multiplicable": bool(t.is_multiplicable),
-        "grant_group": t.grant_group_id, "request_group": t.request_group_id}, prefix="flag_types")
+def _flag_type_to_hash(t) -> dict:
+    """Perl's _flag_type_to_hash is called without $params, so include/exclude_fields never trims it."""
+    return {"id": t.id, "name": t.name, "description": t.description, "cc_list": t.cc_list or "",
+            "sort_key": int(t.sortkey), "is_active": bool(t.is_active), "is_requestable": bool(t.is_requestable),
+            "is_requesteeble": bool(t.is_requesteeble), "is_multiplicable": bool(t.is_multiplicable),
+            "grant_group": t.grant_group_id, "request_group": t.request_group_id}
 
 
 # ---------------------------------------------------------------- validators (Bugzilla::Product)
@@ -359,9 +368,9 @@ def _create_bug_group(ctx: Ctx, product_id: int, name: str):
                {"n": group_name, "d": f"Access to bugs in the {name} product"})
     gid = db.execute(text("SELECT LAST_INSERT_ID()")).scalar()
     _audit(ctx, "Bugzilla::Group", gid, "__create__", None, group_name)
-    db.execute(text("INSERT INTO group_control_map (group_id, product_id, entry, membercontrol, othercontrol, "
-                    "canedit, editcomponents, editbugs, canconfirm) VALUES (:g, :p, 0, 1, 0, 0, 0, 0, 0)"),
-               {"g": gid, "p": product_id})
+    db.execute(text("INSERT INTO group_control_map (group_id, product_id, membercontrol, othercontrol) "
+                    "VALUES (:g, :p, :m, :o)"),
+               {"g": gid, "p": product_id, "m": CONTROLMAPDEFAULT, "o": CONTROLMAPNA})
     db.execute(text("INSERT INTO group_group_map (member_id, grantor_id, grant_type) VALUES (:a, :g, 0)"),
                {"a": db.execute(text("SELECT id FROM groups WHERE name = 'admin'")).scalar(), "g": gid})
 
@@ -388,9 +397,10 @@ def update(ctx: Ctx, ids=None, names=None) -> dict:
     # Bugzilla::WebService::Util::translate(has_unconfirmed => allows_unconfirmed, is_open => is_active)
     translated = {{"has_unconfirmed": "allows_unconfirmed", "is_open": "is_active"}.get(k, k): v
                   for k, v in fields.items()}
+    staged = [(pr, _set_all(ctx, pr, translated)) for pr in products]
     result = []
-    for pr in products:
-        changes = _set_all(ctx, pr, translated)
+    for pr, new_values in staged:
+        changes = _write_changes(ctx, pr, new_values)
         result.append({"id": pr["id"], "changes": {RETURN_MAP[col]: {"removed": str(old), "added": str(new)}
                                                     for col, (old, new) in changes.items()}})
     return {"products": result}
@@ -416,6 +426,7 @@ def _check_product(ctx: Ctx, name=None, pid=None) -> dict:
 
 
 def _set_all(ctx: Ctx, pr: dict, fields: dict) -> dict:
+    """Validate every field against the product (no writes), like Bugzilla::Object::set_all."""
     new_values: dict[str, object] = {}
     for key, value in fields.items():
         if key not in SETTERS:
@@ -430,6 +441,11 @@ def _set_all(ctx: Ctx, pr: dict, fields: dict) -> dict:
             new_values[col] = _check_default_milestone(ctx, value, product=pr)
         else:
             new_values[col] = int(_truthy(value))
+    return new_values
+
+
+def _write_changes(ctx: Ctx, pr: dict, new_values: dict) -> dict:
+    """Bugzilla::Object::update: persist what differs and return {column: (old, new)}."""
     changes = {}
     for col, new in new_values.items():
         old = pr[col]
