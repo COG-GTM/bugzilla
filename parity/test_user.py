@@ -473,3 +473,12 @@ def test_update_groups_must_be_arrays(api, admin_token, new_user):
 def test_update_unknown_field(api, admin_token, new_user):
     expect_error(api.put(f"/user/{new_user['id']}", token=admin_token, json={"bogus": "x"}), 400, 67399,
                  "The requested method 'Bugzilla::User::set_bogus' was not found.")
+
+
+def test_update_password_star_disables_db_login(api, admin_token, scratch_user):
+    u = scratch_user()
+    body = ok(api.put(f"/user/{u['id']}", token=admin_token, json={"password": "*"}))
+    assert body == {"users": [{"id": u["id"], "changes": {
+        "cryptpassword": {"removed": "", "added": "hashed_with_unknown_algorithm"}}}]}
+    expect_error(api.get("/login", params={"login": u["email"], "password": "*"}), 401, 300)
+    expect_error(api.get("/login", params={"login": u["email"], "password": u["password"]}), 401, 300)

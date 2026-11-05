@@ -8,6 +8,7 @@ import base64
 import hashlib
 import re
 import secrets
+import string
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -77,19 +78,35 @@ def check_email_syntax(addr: str):
 
 
 def validate_password(password: str):
+    """Bugzilla::User::validate_password_check."""
     if len(password) < USER_PASSWORD_MIN_LENGTH:
         raise BugzillaError("password_too_short",
                             f"The password must be at least {USER_PASSWORD_MIN_LENGTH} characters long.")
     complexity = param("password_complexity") or "no_constraints"
-    if complexity == "no_constraints":
-        return
-    features = sum(bool(re.search(p, password)) for p in (r"[a-z]", r"[A-Z]", r"\d", r"[^\w\s]"))
-    ok = {"mixed_letters": re.search(r"[a-z]", password) and re.search(r"[A-Z]", password),
-          "letters_numbers": (re.search(r"[a-z]", password) and re.search(r"[A-Z]", password)
-                              and re.search(r"\d", password)),
-          "letters_numbers_specialchars": features >= 3}.get(complexity, True)
-    if not ok:
+    has = {"alpha": any(c.isalpha() for c in password), "lower": any(c.islower() for c in password),
+           "upper": any(c.isupper() for c in password), "digit": re.search(r"\d", password) is not None,
+           "punct": any(c in string.punctuation for c in password)}
+    required = {"letters_numbers_specialchars": ("alpha", "digit", "punct"),
+                "letters_numbers": ("lower", "upper", "digit"),
+                "mixed_letters": ("lower", "upper")}.get(complexity, ())
+    if not all(has[k] for k in required):
         raise BugzillaError("password_not_complex", "The password does not meet our security requirements.")
+
+
+def is_available_username(db: Session, username: str, old_username: str | None = None) -> bool:
+    """Bugzilla::User::is_available_username: not taken, and not reserved by a pending email change."""
+    if db.execute(text("SELECT userid FROM profiles WHERE login_name = :n"), {"n": username}).first():
+        return False
+    row = db.execute(text(
+        "SELECT tokentype, eventdata FROM tokens WHERE "
+        "(tokentype = 'emailold' AND SUBSTRING(eventdata, 1, (POSITION(':' IN eventdata) - 1)) = :u) "
+        "OR (tokentype = 'emailnew' AND SUBSTRING(eventdata, (POSITION(':' IN eventdata) + 1), LENGTH(eventdata)) = :u)"),
+        {"u": username}).first()
+    if not (row and row.eventdata):
+        return True
+    # the owner of the pending change may keep using both addresses
+    return bool(old_username) and ((row.tokentype == "emailnew" and row.eventdata == f"{old_username}:{username}")
+                                   or (row.tokentype == "emailold" and row.eventdata == f"{username}:{old_username}"))
 
 
 def check_login_name(db: Session, login, current_login: str | None = None) -> str:
@@ -98,13 +115,9 @@ def check_login_name(db: Session, login, current_login: str | None = None) -> st
     if not login:
         raise BugzillaError("user_login_required", "You must enter a login name for the new user.")
     check_email_syntax(login)
-    if current_login is None or current_login.lower() != login.lower():
-        taken = db.execute(text("SELECT userid FROM profiles WHERE login_name = :n"), {"n": login}).first()
-        if not taken:
-            taken = db.execute(text("SELECT 1 FROM tokens WHERE tokentype = 'emailnew' AND eventdata LIKE :e"),
-                               {"e": f"%:{login}"}).first()
-        if taken:
-            raise BugzillaError("account_exists", f"There is already an account with the login name {login}.")
+    if ((current_login is None or current_login.lower() != login.lower())
+            and not is_available_username(db, login, current_login)):
+        raise BugzillaError("account_exists", f"There is already an account with the login name {login}.")
     return login
 
 
@@ -116,10 +129,17 @@ def check_password(password) -> str:
     return bz_crypt_hash(password)
 
 
+def sanitize_password(value) -> str | None:
+    """Bugzilla::Object::_sanitize_audit_log: only the hash algorithm is ever exposed ('*' has none)."""
+    if not value:
+        return None
+    algorithm = re.search(r"{([^}]+)}$", str(value))
+    return f"hashed_with_{algorithm.group(1) if algorithm else 'unknown_algorithm'}"
+
+
 def audit_log(db: Session, who: int, object_id: int, field: str, removed, added, when):
     if field == "cryptpassword":
-        algorithm = re.search(r"{([^}]+)}$", added or "")
-        removed, added = None, f"hashed_with_{algorithm.group(1) if algorithm else 'unknown'}"
+        removed, added = None, sanitize_password(added)
     db.execute(text("INSERT INTO audit_log (user_id, class, object_id, field, removed, added, at_time) "
                     "VALUES (:u, 'Bugzilla::User', :o, :f, :r, :a, :t)"),
                {"u": who, "o": object_id, "f": field, "r": removed, "a": added, "t": when})
@@ -309,7 +329,7 @@ def _update_one(ctx: Ctx, user: dict, fields: dict) -> dict:
         if isinstance(old, list):
             old, cur = ",".join(old), ",".join(cur)
         elif column == "cryptpassword":
-            old, cur = "", f"hashed_with_{re.search(r'{([^}]+)}$', cur).group(1)}"
+            old, cur = "", sanitize_password(cur)
         out[COLUMN_TO_API.get(column, column)] = {"removed": "" if old is None else str(old),
                                                   "added": "" if cur is None else str(cur)}
     return {"id": user["id"], "changes": out}

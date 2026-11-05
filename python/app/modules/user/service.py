@@ -173,14 +173,26 @@ def bless_group_ids(db: Session, user: User) -> set[int]:
 
 
 def visible_group_ids(db: Session, user: User) -> set[int]:
-    """Bugzilla::User::visible_groups_inherited (own groups plus the ones they grant visibility to)."""
-    if not user.group_ids:
+    """Bugzilla::User::visible_groups_inherited: groups granted GROUP_VISIBLE to any of the caller's
+    groups (visible_groups_direct), plus every group that is a member of those
+    (Bugzilla::Group::flatten_group_membership). Membership alone grants no visibility."""
+    if not user.is_logged_in:
         return set()
-    ids = set(user.group_ids)
-    ids |= {r[0] for r in db.execute(text(
-        "SELECT DISTINCT grantor_id FROM group_group_map WHERE grant_type = :t AND member_id IN "
-        f"({','.join(map(str, user.group_ids))})"), {"t": GROUP_VISIBLE})}
-    return ids
+    if not perl_true(param("usevisibilitygroups")):
+        return {r[0] for r in db.execute(text("SELECT id FROM groups"))}
+    member_ids = ",".join(map(str, user.group_ids)) or "-1"
+    visible = {r[0] for r in db.execute(text(
+        f"SELECT DISTINCT grantor_id FROM group_group_map WHERE member_id IN ({member_ids}) AND grant_type = :t"),
+        {"t": GROUP_VISIBLE})}
+    todo = list(visible)
+    while todo:
+        node = todo.pop(0)
+        for (member,) in db.execute(text("SELECT member_id FROM group_group_map WHERE grantor_id = :g "
+                                         "AND grant_type = :t"), {"g": node, "t": GROUP_MEMBERSHIP}):
+            if member not in visible:
+                visible.add(member)
+                todo.append(member)
+    return visible
 
 
 def can_see_user(db: Session, viewer: User, other_id: int) -> bool:
