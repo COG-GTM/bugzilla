@@ -1,6 +1,13 @@
 from pydantic import BaseModel
 
 
+class ErrorEnvelope(BaseModel):
+    error: bool = True
+    code: int
+    message: str
+    documentation: str
+
+
 class VersionOut(BaseModel):
     version: str
 
@@ -18,8 +25,12 @@ class TimeOut(BaseModel):
     tz_short_name: str
 
 
+class ExtensionVersion(BaseModel):
+    version: str
+
+
 class ExtensionsOut(BaseModel):
-    extensions: dict[str, dict[str, str]]
+    extensions: dict[str, ExtensionVersion]
 
 
 class LastAuditTimeOut(BaseModel):
@@ -27,4 +38,4 @@ class LastAuditTimeOut(BaseModel):
 
 
 class ParametersOut(BaseModel):
-    parameters: dict[str, str]
+    parameters: dict[str, str | None]
