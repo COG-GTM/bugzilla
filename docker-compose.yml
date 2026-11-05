@@ -41,6 +41,7 @@ services:
     volumes:
       - bugzilla5-data-dir:/var/www/html/data:ro
       - ./python/app:/srv/app:ro
+      - ./extensions:/var/www/html/extensions:ro
     ports:
       - 8000:8000
     depends_on:

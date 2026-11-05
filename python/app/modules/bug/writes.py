@@ -137,6 +137,8 @@ def check_component(db: Session, product, name) -> dict:
                           "WHERE product_id = :p AND name = :n"), {"p": product["id"], "n": name}).mappings().first()
     if not row:
         raise object_does_not_exist("component", name, product["name"])
+    if not row["isactive"]:
+        raise BugzillaError("value_inactive", f"The component value '{row['name']}' is not active.")
     return row
 
 

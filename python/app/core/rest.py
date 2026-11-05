@@ -72,9 +72,10 @@ async def context(request: Request, db: Session = Depends(get_db)) -> Ctx:
     params = await merged_params(request)
     user = authenticate(db, params) if any(k in params for k in CREDENTIAL_RENAMES.values()) else ANONYMOUS
     callback = params.get("callback")
-    if callback is not None and not re.match(r"^[\w.\[\]]+$", str(callback)):
-        raise BugzillaError("json_rpc_invalid_callback", "You specified an invalid callback name. Callback names "
-                            "may only contain letters, numbers, underscores, dots and square brackets.")
+    if callback is not None and not re.match(r"^[A-Za-z0-9_.\[\]]+$", str(callback)):
+        raise BugzillaError("json_rpc_invalid_callback",
+                            f"You cannot use '{callback}' as your 'callback' parameter. For security reasons, only "
+                            "letters, numbers, and the following characters are allowed in the 'callback' parameter: []._")
     request.state.callback = callback
     return Ctx(request=request, db=db, params=params, user=user, filter=Filter.from_params(params))
 
@@ -85,7 +86,7 @@ def json_response(request: Request, payload: Any, status: int = 200) -> Response
                "Access-Control-Allow-Headers": "origin, content-type, accept, x-requested-with",
                "ETag": '"' + hashlib.md5(body.encode()).hexdigest() + '"'}
     callback = getattr(request.state, "callback", None)
-    if callback and re.match(r"^[\w.\[\]]+$", str(callback)):
+    if callback and re.match(r"^[A-Za-z0-9_.\[\]]+$", str(callback)):
         return Response(f"/**/{callback}({body})", status_code=status, media_type="text/javascript",
                         headers=headers)
     return Response(body, status_code=status, media_type="application/json", headers=headers)
