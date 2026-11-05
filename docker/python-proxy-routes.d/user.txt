@@ -1,0 +1,6 @@
+# User module (Bugzilla::WebService::User): REST path prefixes (regex, relative to /rest.cgi/) served by Python.
+# `user` also matches user/{id_or_name}; login/logout/valid_login live at the REST root.
+user
+login
+logout
+valid_login
