@@ -180,9 +180,11 @@ DEPENDENCIES = [
     ("seed-009", ["seed-008"]),
 ]
 
+# Transitions walked from the status a bug was filed with (CONFIRMED, or
+# UNCONFIRMED for reporters without canconfirm) to the status in the spec.
 STATUS_PATH = {
-    "CONFIRMED": [],
-    "IN_PROGRESS": [("IN_PROGRESS", None)],
+    "CONFIRMED": [("CONFIRMED", None)],
+    "IN_PROGRESS": [("CONFIRMED", None), ("IN_PROGRESS", None)],
     "RESOLVED": [("RESOLVED", "resolution")],
     "VERIFIED": [("RESOLVED", "resolution"), ("VERIFIED", None)],
 }
@@ -316,11 +318,11 @@ def ensure_bugs(base_url, admin):
         return sessions[email]
 
     def apply_status(spec, bug_id, current_status):
-        """Walk the status path, skipping steps the bug has already reached."""
-        reached = current_status == spec["status"]
+        """Walk the status path from ``current_status``; return the number of transitions made."""
+        if current_status == spec["status"]:
+            return 0
+        made = 0
         for status, needs_resolution in STATUS_PATH[spec["status"]]:
-            if reached:
-                break
             if status == current_status:
                 continue
             change = {"status": status}
@@ -330,6 +332,10 @@ def ensure_bugs(base_url, admin):
                     change["dupe_of"] = ids[spec["dupe_of"]]
             as_user(spec["assigned_to"]).put(f"/bug/{bug_id}", change)
             current_status = status
+            made += 1
+            if current_status == spec["status"]:
+                break
+        return made
 
     def reconcile(spec, existing):
         """Finish a bug that an earlier, interrupted run left half-seeded."""
@@ -341,9 +347,7 @@ def ensure_bugs(base_url, admin):
             if text not in have_text:
                 as_user(author).post(f"/bug/{bug_id}/comment", {"comment": text})
                 fixed += 1
-        if existing["status"] != spec["status"]:
-            apply_status(spec, bug_id, existing["status"])
-            fixed += 1
+        fixed += apply_status(spec, bug_id, existing["status"])
         return fixed
 
     ids = {}
@@ -374,7 +378,8 @@ def ensure_bugs(base_url, admin):
         for author, text in spec["comments"]:
             as_user(author).post(f"/bug/{bug_id}/comment", {"comment": text})
 
-        apply_status(spec, bug_id, "CONFIRMED")
+        filed_as = find_bug(admin, spec["alias"])["status"]
+        apply_status(spec, bug_id, filed_as)
 
     # Reconcile after the create loop so dupe_of targets always have ids.
     for spec, existing in pending:
