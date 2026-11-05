@@ -20,6 +20,7 @@ services:
       - 8080:80
     depends_on:
       - bugzilla5.db
+      - bugzilla5.api
     environment: &bugzilla_env
       - BZ_ADMIN_EMAIL=admin@bugzilla.test
       - BZ_ADMIN_PASSWORD=password01!

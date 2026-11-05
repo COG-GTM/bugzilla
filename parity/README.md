@@ -9,7 +9,7 @@ parity for a migrated module.
 make parity-deps                   # pytest + httpx
 make seed                          # optional demo data (scripts/seed_demo_data.py)
 make parity                        # TARGET=perl, BASE_URL=http://127.0.0.1:8080/rest.cgi
-make parity TARGET=python          # BASE_URL=http://127.0.0.1:8000/rest.cgi
+make parity TARGET=python          # BASE_URL=http://127.0.0.1:8000/rest.cgi (fixtures via FIXTURE_BASE_URL=Perl)
 make parity PYTEST_ARGS="-k comment -x"
 ```
 
