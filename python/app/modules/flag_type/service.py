@@ -8,7 +8,7 @@ import re
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.auth import User
+from app.core.auth import User, user_group_ids
 from app.core.errors import BugzillaError, param_required, params_required
 from app.core.rest import Ctx
 from app.modules.bug.service import object_does_not_exist, object_not_specified
@@ -100,7 +100,8 @@ def can_access_product(ctx: Ctx, product_id: int) -> bool:
                           {"p": product_id}).all()
     see = {r[0] for r in rows if r[1] == 3}
     enter = {r[0] for r in rows if r[2]}
-    return see <= ctx.user.group_ids or enter <= ctx.user.group_ids
+    is_active = ctx.db.execute(text("SELECT isactive FROM products WHERE id = :p"), {"p": product_id}).scalar()
+    return see <= ctx.user.group_ids or (bool(is_active) and enter <= ctx.user.group_ids)
 
 
 def check_product(ctx: Ctx, name) -> dict:
@@ -276,24 +277,39 @@ def after_update(db: Session, row: dict):
 
 
 def retarget_flag(db: Session, flag_id: int, row: dict):
-    """Bugzilla::Flag::force_retarget: move the flag to a same-named type valid for its bug, else delete it."""
-    flag = db.execute(text("SELECT flags.id, flags.bug_id, bugs.product_id, bugs.component_id FROM flags "
-                           "INNER JOIN bugs ON bugs.bug_id = flags.bug_id WHERE flags.id = :f"), {"f": flag_id}).first()
+    """Bugzilla::Flag::force_retarget -> Bugzilla::Flag::retarget: move the flag to the first same-named, active
+    type valid for its bug/attachment that the setter may still set (or request, for '?'), honouring
+    is_multiplicable; otherwise delete it. (Perl also emails a cancellation; the Python service has no mail yet.)"""
+    flag = db.execute(text(
+        "SELECT flags.id, flags.bug_id, flags.attach_id, flags.status, flags.setter_id, bugs.product_id, "
+        "bugs.component_id FROM flags INNER JOIN bugs ON bugs.bug_id = flags.bug_id WHERE flags.id = :f"),
+        {"f": flag_id}).first()
     if not flag:
         return
-    target = db.execute(text(
-        "SELECT flagtypes.id FROM flagtypes INNER JOIN flaginclusions AS i ON flagtypes.id = i.type_id "
-        "AND (i.product_id = :p OR i.product_id IS NULL) AND (i.component_id = :c OR i.component_id IS NULL) "
+    target_type = "a" if flag.attach_id else "b"
+    candidates = db.execute(text(
+        "SELECT * FROM flagtypes WHERE id IN (SELECT flagtypes.id FROM flagtypes "
+        "INNER JOIN flaginclusions AS i ON flagtypes.id = i.type_id "
         "LEFT JOIN flagexclusions AS e ON (flagtypes.id = e.type_id AND (e.component_id = :c OR e.component_id IS NULL) "
         "AND ((e.product_id = :p) OR e.product_id IS NULL)) "
-        "WHERE flagtypes.name = :n AND flagtypes.target_type = :tt AND flagtypes.is_active = 1 AND e.type_id IS NULL "
-        "AND flagtypes.id != :self ORDER BY flagtypes.sortkey, flagtypes.name LIMIT 1"),
-        {"p": flag.product_id, "c": flag.component_id, "n": row["name"], "tt": row["target_type"],
-         "self": row["id"]}).first()
-    if target:
-        db.execute(text("UPDATE flags SET type_id = :t WHERE id = :f"), {"t": target[0], "f": flag_id})
-    else:
-        db.execute(text("DELETE FROM flags WHERE id = :f"), {"f": flag_id})
+        "WHERE flagtypes.target_type = :tt AND (i.product_id = :p OR i.product_id IS NULL) "
+        "AND (i.component_id = :c OR i.component_id IS NULL) AND e.type_id IS NULL) "
+        "AND name = :n AND is_active = 1 ORDER BY sortkey, name"),
+        {"p": flag.product_id, "c": flag.component_id, "tt": target_type, "n": row["name"]}).mappings().all()
+    setter_groups = user_group_ids(db, flag.setter_id)
+    setter = User(id=flag.setter_id, group_ids=setter_groups)
+    for ft in candidates:
+        if not ft["is_multiplicable"]:
+            attach = "flags.attach_id = :a" if flag.attach_id else "flags.attach_id IS NULL"
+            taken = db.execute(text(f"SELECT COUNT(*) FROM flags WHERE type_id = :t AND bug_id = :b AND {attach}"),
+                               {"t": ft["id"], "b": flag.bug_id, "a": flag.attach_id}).scalar()
+            if taken:
+                continue
+        if not ((flag.status == "?" and can_request_flag(setter, ft)) or can_set_flag(setter, ft)):
+            continue
+        db.execute(text("UPDATE flags SET type_id = :t WHERE id = :f"), {"t": ft["id"], "f": flag_id})
+        return
+    db.execute(text("DELETE FROM flags WHERE id = :f"), {"f": flag_id})
 
 
 # ---------------------------------------------------------------- FlagType.get
@@ -434,6 +450,44 @@ def create(ctx: Ctx) -> dict:
     return {"id": ft_id}
 
 
+def clusions_hash(db: Session, ft_id: int, kind: str) -> dict[int, dict[int, bool]]:
+    """Bugzilla::FlagType::inclusions_as_hash / exclusions_as_hash: {product_id: {component_id: True}}."""
+    out: dict[int, dict[int, bool]] = {}
+    for pid, cid in clusions(db, ft_id, kind).values():
+        out.setdefault(pid, {})[cid] = True
+    return out
+
+
+def check_can_admin_flagtype(ctx: Ctx, ft_id) -> tuple[dict, bool, set[int] | None]:
+    """Bugzilla::User::check_can_admin_flagtype -> (flagtype row, can_fully_edit, admin product ids or None)."""
+    row = check_flagtype(ctx.db, ft_id)
+    if ctx.user.in_group("editcomponents"):
+        return row, True, None
+    products = set(products_by_permission(ctx.db, ctx.user))
+    if not products:
+        raise auth_failure("edit")
+    i = clusions_hash(ctx.db, row["id"], "in")
+    e = clusions_hash(ctx.db, row["id"], "ex")
+    can_fully_edit = all(pid in products for pid in i)
+    can_admin = False
+    if not e.get(0, {}).get(0):
+        for pid in products:
+            if e.get(pid, {}).get(0):
+                continue
+            can_admin = bool(i.get(0, {}).get(0) or i.get(pid, {}).get(0)
+                             or [c for c in i.get(pid, {}) if not e.get(pid, {}).get(c)])
+            if can_admin:
+                break
+    if not can_admin:
+        raise not_editable(row)
+    return row, can_fully_edit, products
+
+
+def not_editable(row: dict) -> BugzillaError:
+    return BugzillaError("flag_type_not_editable", f"You are not allowed to edit properties of the '{row['name']}' "
+                         "flag type, because this flag type is not available for the products you can administer.")
+
+
 # ---------------------------------------------------------------- FlagType.update
 def update(ctx: Ctx) -> dict:
     ctx.user.require_login()
@@ -465,7 +519,9 @@ def update(ctx: Ctx) -> dict:
     db = ctx.db
     result = []
     for ft_id in ids:
-        old = check_flagtype(db, ft_id)
+        old, can_fully_edit, admin_products = check_can_admin_flagtype(ctx, ft_id)
+        if not can_fully_edit and fields:
+            raise not_editable(old)
         new = dict(old)
         for key in sorted(fields):  # Bugzilla::Object::set_all sorts the fields
             if key not in SETTERS:
@@ -487,12 +543,14 @@ def update(ctx: Ctx) -> dict:
                        {**{c: new[c] for c in changes}, "id": old["id"]})
             for column, (removed, added) in changes.items():
                 audit(db, ctx.user.id, old["id"], column, removed, added)
-        if inclusions is not None:
-            write_clusions(db, old["id"], "in", inclusions)
-            changes["inclusions"] = ("0", "1")
-        if exclusions is not None:
-            write_clusions(db, old["id"], "ex", exclusions)
-            changes["exclusions"] = ("0", "1")
+        for kind, wanted in (("in", inclusions), ("ex", exclusions)):
+            if wanted is None:
+                continue
+            extra = []
+            if admin_products is not None:  # bring back the products this admin cannot edit
+                extra = [pair for pair in clusions(db, old["id"], kind).values() if pair[0] not in admin_products]
+            write_clusions(db, old["id"], kind, wanted + extra)
+            changes[f"{kind}clusions"] = ("0", "1")
         after_update(db, new)
         result.append({"id": old["id"], "name": new["name"],
                        "changes": {f: {"removed": r, "added": a} for f, (r, a) in changes.items()}})
