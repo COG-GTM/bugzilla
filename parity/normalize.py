@@ -105,7 +105,12 @@ def normalize(
             if literal:
                 # Whole-token only, so an admin login that is a suffix of another address
                 # (user@x vs parity.user@x) does not rewrite that other identity.
-                value = re.sub(rf"(?<![A-Za-z0-9._%+-]){re.escape(literal)}(?![A-Za-z0-9._%+-])", placeholder, value)
+                # A trailing "." only continues the address when another address character follows.
+                value = re.sub(
+                    rf"(?<![A-Za-z0-9._%+-]){re.escape(literal)}(?![A-Za-z0-9_%+-]|\.[A-Za-z0-9])",
+                    placeholder,
+                    value,
+                )
         if key == "message":
             # Error messages embed ids chosen at run time ("Bug #1234 does not exist",
             # "Bug 17 has already taken the alias ...").
