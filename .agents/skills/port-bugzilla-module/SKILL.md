@@ -92,7 +92,7 @@ make parity-report                                       # endpoint | Perl | Pyt
 
 ## 5. Cut the routes over
 
-Create `docker/python-proxy-routes.d/<module>.txt` with the module's path prefix(es) (one regex alternative per
+Create `docker/python-proxy-routes.d/<module>.txt` (the directory is COPYed into the web image, so verify with `docker compose up -d --build bugzilla5.web` — without `--build` the new rule is not picked up) with the module's path prefix(es) (one regex alternative per
 line, e.g. `product`, `field/bug`). `docker/startup.sh` turns them into `ProxyPassMatch` rules
 when `BZ_PYTHON_UPSTREAM=http://bugzilla5.python:8000` is set:
 

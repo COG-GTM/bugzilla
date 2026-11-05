@@ -22,6 +22,13 @@ GROUPS = OrderedDict([
     ("test_bug_comments_history", "Bug.comments / add_comment / history"),
     ("test_bug_attachments", "Bug.attachments / add_attachment (metadata)"),
     ("test_bug_fields", "Bug.fields / legal_values  (GET /field/bug...)"),
+    ("test_classification", "Classification.get  (GET /classification/{id_or_name})"),
+    ("test_product", "Product.get / selectable / enterable / accessible / create / update"),
+    ("test_component", "Component.create / update"),
+    ("test_group", "Group.get / create / update"),
+    ("test_user", "User.get / create / update"),
+    ("test_flag_type", "FlagType.get / create / update"),
+    ("test_bug_user_last_visit", "BugUserLastVisit.get / update"),
 ])
 
 
