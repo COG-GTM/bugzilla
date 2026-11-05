@@ -1,0 +1,2 @@
+# Component module (Bugzilla::WebService::Component): REST path prefixes (regex, relative to /rest.cgi/) served by Python.
+component
