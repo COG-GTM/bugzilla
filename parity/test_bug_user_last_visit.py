@@ -130,10 +130,18 @@ def test_update_not_involved_user(api, user_token, uninvolved_bug):
                  400, 32000, f"Sorry, but you are not involved with Bug {uninvolved_bug}.")
 
 
-def test_update_admin_is_not_special(api, admin_token, seed):
-    # seed-01: reporter alice, assignee chen, cc bruno
-    expect_error(api.post(f"/bug_user_last_visit/{seed['seed-01']}", token=admin_token),
-                 400, 32000, f"Sorry, but you are not involved with Bug {seed['seed-01']}.")
+def test_update_admin_is_not_special(api, admin_token, user_token):
+    # a bug filed by alice and assigned to chen: admin is not reporter/assignee/cc, so admin is not involved
+    # (other parity suites may touch the seeded bugs, so do not rely on seed-01 here)
+    from parity.conftest import SEED_COMPONENT, SEED_PRODUCT, SEED_VERSION, unique
+    r = api.post("/bug", token=user_token, json={
+        "product": SEED_PRODUCT, "component": SEED_COMPONENT, "version": SEED_VERSION,
+        "summary": unique(), "description": "created by the parity suite", "op_sys": "All", "platform": "All",
+        "priority": "Normal", "severity": "normal", "assigned_to": OTHER_USER})
+    assert r.status_code == 200, r.text
+    bug_id = r.json()["id"]
+    expect_error(api.post(f"/bug_user_last_visit/{bug_id}", token=admin_token),
+                 400, 32000, f"Sorry, but you are not involved with Bug {bug_id}.")
 
 
 def test_update_anonymous_is_not_involved_rather_than_login_required(api, involved_bug):
