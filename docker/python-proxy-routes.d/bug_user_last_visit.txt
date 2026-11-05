@@ -1,0 +1,2 @@
+# BugUserLastVisit module (python/app/modules/bug_user_last_visit): GET|POST /bug_user_last_visit/{bug_id}
+bug_user_last_visit
