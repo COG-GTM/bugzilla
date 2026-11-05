@@ -3,9 +3,9 @@ Bugzilla/Group.pm (validators, admin inheritance, regexp membership, audit log) 
 (bless / visibility helpers) that the WebService exercises."""
 
 import re
+import subprocess
 
 from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError
 
 from app.core.errors import BugzillaError
 from app.core.params import param
@@ -193,19 +193,42 @@ def check_description(desc) -> str:
     return desc
 
 
-def check_user_regexp(ctx: Ctx, regexp) -> str:
+def check_user_regexp(regexp) -> str:
     regexp = trim(regexp)
     if not perl_true(regexp):
         regexp = ""
-    if regexp != "":
-        try:
-            # Perl validates with qr//; MariaDB's PCRE2 engine is the closest match to Perl's regex
-            # dialect we have (\p{..}, \k<..>, \z, possessive quantifiers ...), and _rederive_regexp
-            # below matches with the same engine, so accept/reject and membership stay consistent.
-            ctx.db.execute(text("SELECT '' REGEXP :re"), {"re": regexp})
-        except DBAPIError:
-            raise BugzillaError("invalid_regexp", "The regular expression you entered is invalid.")
+    if regexp != "" and perl_regexp(regexp, []) is None:
+        raise BugzillaError("invalid_regexp", "The regular expression you entered is invalid.")
     return regexp
+
+
+PERL_REGEXP_SCRIPT = r"""
+use strict; use warnings;
+binmode STDIN; local $/;
+my ($re, @logins) = split /\0/, <STDIN>, -1;
+utf8::decode($re);
+my $qr = eval { qr/$re/i };
+if (!defined $qr) { print "INVALID\n"; exit 0 }
+my @matched; my $i = 0;
+for my $login (@logins) { utf8::decode($login); push @matched, $i if $login =~ $qr; $i++ }
+print "OK @matched\n";
+"""
+
+
+def perl_regexp(regexp: str, logins: list[str]) -> list[int] | None:
+    """Compile *regexp* with Perl itself — the stored pattern is consumed by the Perl app's qr// and
+    m//i (Group::_check_user_regexp, Group::_rederive_regexp, User::derive_regexp_groups), and no
+    Python/PCRE engine agrees with Perl's dialect in both directions. Returns the indexes of the
+    matching logins, or None when Perl cannot compile the pattern. Only perl-base is needed
+    (no modules), which the python:*-slim image ships."""
+    payload = "\0".join([regexp, *logins]).encode()
+    try:
+        proc = subprocess.run(["perl", "-e", PERL_REGEXP_SCRIPT], input=payload, capture_output=True,
+                              timeout=10, check=True)
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+        return None
+    out = proc.stdout.decode().split()
+    return [int(i) for i in out[1:]] if out and out[0] == "OK" else None
 
 
 def check_icon_url(url):
@@ -222,14 +245,17 @@ def audit_log(ctx: Ctx, gid: int, field: str, removed, added):
 
 def rederive_regexp(ctx: Ctx, gid: int, regexp: str):
     """Bugzilla::Group::_rederive_regexp: sync the GRANT_REGEXP rows of user_group_map with the regexp."""
-    # Perl: ($regexp ne '') && ($login =~ m/$regexp/i)
     rows = ctx.db.execute(text(
-        "SELECT userid, group_id, (:re <> '' AND login_name REGEXP CONCAT('(?i)', :re)) AS matched "
-        "FROM profiles LEFT JOIN user_group_map "
+        "SELECT userid, login_name, group_id FROM profiles LEFT JOIN user_group_map "
         "ON user_group_map.user_id = profiles.userid AND group_id = :gid AND grant_type = :gt AND isbless = 0"),
-        {"gid": gid, "gt": GRANT_REGEXP, "re": regexp}).all()
-    for uid, present, matched in rows:
-        matches = bool(matched)
+        {"gid": gid, "gt": GRANT_REGEXP}).all()
+    # Perl: ($regexp ne '') && ($login =~ m/$regexp/i)
+    matched = perl_regexp(regexp, [login for _, login, _ in rows]) if regexp != "" else []
+    if matched is None:
+        raise BugzillaError("invalid_regexp", "The regular expression you entered is invalid.")
+    matched = set(matched)
+    for i, (uid, _login, present) in enumerate(rows):
+        matches = i in matched
         if matches and present is None:
             ctx.db.execute(text("INSERT INTO user_group_map (user_id, group_id, grant_type, isbless) "
                                 "VALUES (:uid, :gid, :gt, 0)"), {"uid": uid, "gid": gid, "gt": GRANT_REGEXP})
@@ -330,7 +356,7 @@ def create(ctx: Ctx) -> dict:
     isactive = 1 if perl_true(p.get("is_active")) else 0
     isbuggroup = 1
     name = check_name(ctx, p.get("name"))
-    userregexp = check_user_regexp(ctx, p.get("user_regexp"))
+    userregexp = check_user_regexp(p.get("user_regexp"))
 
     result = ctx.db.execute(text(
         "INSERT INTO groups (name, description, isbuggroup, userregexp, isactive, icon_url) "
@@ -398,7 +424,7 @@ def set_all(ctx: Ctx, group: dict, values: dict) -> dict:
         elif key == "description":
             new["description"] = check_description(value)
         elif key == "user_regexp":
-            new["userregexp"] = check_user_regexp(ctx, value)
+            new["userregexp"] = check_user_regexp(value)
         elif key == "is_active":
             new["isactive"] = 1 if perl_true(value) else 0
         elif key == "icon_url":

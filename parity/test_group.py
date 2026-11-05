@@ -119,6 +119,14 @@ def test_create_regexp_perl_dialect(api, admin_token, new_group):
     assert [m["name"] for m in g["membership"]] == ["admin@bugzilla.test", "alice.ng@bugzilla.test"]
 
 
+@pytest.mark.parametrize("regexp", ["(", "(?J)^alice", "(*LIMIT_MATCH=100)^alice", "\\d{", "(?{ die })",
+                                    "^\\N{LATIN SMALL LETTER A}lice"])
+def test_create_regexp_rejected_like_perl(api, admin_token, regexp):
+    # PCRE2 / Python re accept some of these; Perl's qr// (the consumer of the stored pattern) does not
+    r = api.post("/group", token=admin_token, json={"name": gname(), "description": "d", "user_regexp": regexp})
+    expect_error(r, 400, 803, "The regular expression you entered is invalid.")
+
+
 @pytest.mark.parametrize("value", ["0", ""])
 def test_get_membership_false_values(api, admin_token, value):
     (g,) = get_groups(api, admin_token, ids=1, membership=value)
