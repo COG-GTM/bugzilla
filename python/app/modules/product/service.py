@@ -46,6 +46,11 @@ def _truthy(value) -> bool:
     return s not in ("", "0")
 
 
+def _param_on(name: str) -> bool:
+    """Bugzilla boolean params are stored as the strings "0"/"1" (data/params.json)."""
+    return _truthy(param(name))
+
+
 def _trim(value) -> str:
     return "" if value is None else str(value).strip()
 
@@ -59,7 +64,7 @@ def _group_clause(ctx: Ctx) -> str:
     """Tail of the group_control_map join in User::get_selectable/enterable_products.
     or_groups: the user is in at least one of the controlling groups, or there are none.
     Otherwise: there must be no controlling group the user is not in."""
-    if param("or_groups"):
+    if _param_on("or_groups"):
         return f"WHERE (gcm.group_id IN ({_groups_sql(ctx)}) OR gcm.group_id IS NULL)"
     return f"AND gcm.group_id NOT IN ({_groups_sql(ctx)}) WHERE gcm.group_id IS NULL"
 
@@ -255,7 +260,7 @@ def _check_version(version) -> str:
 
 
 def _check_classification(ctx: Ctx, name) -> int:
-    if not param("useclassification"):
+    if not _param_on("useclassification"):
         return 1
     if name is None:
         return 1
@@ -269,7 +274,7 @@ def _check_classification(ctx: Ctx, name) -> int:
 
 
 def _check_default_milestone(ctx: Ctx, milestone, product: dict | None = None) -> str:
-    if not param("usetargetmilestone"):
+    if not _param_on("usetargetmilestone"):
         return product["defaultmilestone"] if product else "---"
     milestone = _trim(milestone)
     if product is not None:
@@ -315,7 +320,7 @@ def create(ctx: Ctx) -> dict:
     _audit(ctx, "Bugzilla::Milestone", db.execute(text("SELECT LAST_INSERT_ID()")).scalar(), "__create__", None,
            defaultmilestone)
 
-    if param("makeproductgroups"):
+    if _param_on("makeproductgroups"):
         _create_bug_group(ctx, product_id, name)
     if create_series:
         _create_series(ctx, name)
