@@ -127,6 +127,14 @@ def test_create_regexp_rejected_like_perl(api, admin_token, regexp):
     expect_error(r, 400, 803, "The regular expression you entered is invalid.")
 
 
+def test_create_regexp_with_nul_byte(api, admin_token, new_group):
+    # a NUL inside the pattern is a literal NUL for Perl: valid, matches nobody (admin only inherits)
+    gid, name = new_group(user_regexp="^alice\x00bob$")
+    (g,) = get_groups(api, admin_token, ids=gid, membership=1)
+    assert g["user_regexp"] == "^alice\x00bob$"
+    assert g["membership"] == [ADMIN]
+
+
 @pytest.mark.parametrize("value", ["0", ""])
 def test_get_membership_false_values(api, admin_token, value):
     (g,) = get_groups(api, admin_token, ids=1, membership=value)

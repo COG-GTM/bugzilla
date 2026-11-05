@@ -205,12 +205,14 @@ def check_user_regexp(regexp) -> str:
 PERL_REGEXP_SCRIPT = r"""
 use strict; use warnings;
 binmode STDIN; local $/;
-my ($re, @logins) = split /\0/, <STDIN>, -1;
-utf8::decode($re);
+my ($header, $body) = split /\n/, <STDIN>, 2;   # "len len ...\n" + concatenated UTF-8 items
+my @items; my $off = 0;
+for my $len (split / /, $header) { push @items, substr($body, $off, $len); $off += $len }
+my $re = shift @items; utf8::decode($re);
 my $qr = eval { qr/$re/i };
 if (!defined $qr) { print "INVALID\n"; exit 0 }
 my @matched; my $i = 0;
-for my $login (@logins) { utf8::decode($login); push @matched, $i if $login =~ $qr; $i++ }
+for my $login (@items) { utf8::decode($login); push @matched, $i if $login =~ $qr; $i++ }
 print "OK @matched\n";
 """
 
@@ -218,10 +220,12 @@ print "OK @matched\n";
 def perl_regexp(regexp: str, logins: list[str]) -> list[int] | None:
     """Compile *regexp* with Perl itself — the stored pattern is consumed by the Perl app's qr// and
     m//i (Group::_check_user_regexp, Group::_rederive_regexp, User::derive_regexp_groups), and no
-    Python/PCRE engine agrees with Perl's dialect in both directions. Returns the indexes of the
+    Python/PCRE engine agrees with Perl's dialect in both directions. Items are length-prefixed so
+    NULs or newlines inside the pattern/logins cannot split them. Returns the indexes of the
     matching logins, or None when Perl cannot compile the pattern. Only perl-base is needed
     (no modules), which the python:*-slim image ships."""
-    payload = "\0".join([regexp, *logins]).encode()
+    items = [item.encode() for item in (regexp, *logins)]
+    payload = b" ".join(str(len(item)).encode() for item in items) + b"\n" + b"".join(items)
     try:
         proc = subprocess.run(["perl", "-e", PERL_REGEXP_SCRIPT], input=payload, capture_output=True,
                               timeout=10, check=True)
