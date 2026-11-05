@@ -109,12 +109,15 @@ def all_products(db: Session, classification_id: int) -> list[dict]:
 def selectable_products(db: Session, user: User, classification_id: int | None = None) -> list[dict]:
     """``Bugzilla::User::get_selectable_products``: products without a MANDATORY group the user is not in."""
     groups = ",".join(map(str, sorted(user.group_ids))) or "-1"
-    sql = f"SELECT {PRODUCT_COLUMNS} FROM products LEFT JOIN group_control_map " \
+    # DISTINCT: Perl feeds the ids into new_from_list (an IN query), so a product never repeats even when
+    # or_groups joins one group_control_map row per mandatory group the user belongs to.
+    sql = f"SELECT DISTINCT {PRODUCT_COLUMNS} FROM products LEFT JOIN group_control_map " \
           f"ON group_control_map.product_id = products.id AND group_control_map.membercontrol = {CONTROLMAPMANDATORY}"
     if _true(param("or_groups")):
-        sql += f" WHERE group_id IN ({groups}) OR group_id IS NULL"
+        sql += f" WHERE (group_id IN ({groups}) OR group_id IS NULL)"
     else:
         sql += f" AND group_id NOT IN ({groups}) WHERE group_id IS NULL"
+    # Perl filters the full selectable set by classification afterwards (User.pm get_selectable_products)
     if classification_id is not None and _true(param("useclassification")):
         sql += " AND classification_id = :cid"
     sql += " ORDER BY products.name"

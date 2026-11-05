@@ -89,8 +89,26 @@ def extra_classification(db):
            f"DELETE FROM groups WHERE id = {gid}; DELETE FROM classifications WHERE id IN ({cid}, {empty_id})")
 
 
+def _set_param(name: str, value: str):
+    _compose(WEB_SERVICE, "sed", "-i", f's/"{name}" : "[01]"/"{name}" : "{value}"/', PARAMS_JSON)
+
+
 def _set_useclassification(value: str):
-    _compose(WEB_SERVICE, "sed", "-i", f's/"useclassification" : "[01]"/"useclassification" : "{value}"/', PARAMS_JSON)
+    _set_param("useclassification", value)
+
+
+@pytest.fixture
+def or_groups_enabled(db):
+    """Flip ``or_groups`` on in params.json for one test (both backends read it)."""
+    try:
+        _compose(WEB_SERVICE, "grep", "-q", '"or_groups" : "0"', PARAMS_JSON)
+    except subprocess.CalledProcessError:
+        pytest.skip("or_groups is not disabled in params.json")
+    _set_param("or_groups", "1")
+    try:
+        yield
+    finally:
+        _set_param("or_groups", "0")
 
 
 @pytest.fixture
@@ -311,6 +329,20 @@ def test_names_come_before_ids_and_duplicates_collapse(api, extra_classification
         [c["name"], "Unclassified"]
     assert [x["name"] for x in _classification(api, c["name"], params={"ids": 1, "include_fields": "name"})] == \
         [c["name"], "Unclassified"]
+
+
+def test_or_groups_keeps_products_scoped_to_their_classification(api, extra_classification, user_token,
+                                                                 or_groups_enabled):
+    """get_selectable_products with or_groups: `group_id IN (...) OR group_id IS NULL` must still be
+    restricted to the requested classification, and restricted products stay hidden."""
+    c = extra_classification
+    time.sleep(2.5)  # the Python service re-reads params.json at most every 2s
+    for kw in ({}, {"token": user_token}):
+        (cls,) = _classification(api, c["id"], **kw)
+        assert [p["name"] for p in cls["products"]] == [c["open"]]
+        (cls,) = _classification(api, "Unclassified", **kw)
+        assert SEED_PRODUCTS <= {p["name"] for p in cls["products"]}
+        assert not {c["open"], c["secret"]} & {p["name"] for p in cls["products"]}
 
 
 def test_classification_not_enabled(api, classification_disabled, user_token, admin_token):
