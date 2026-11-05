@@ -88,8 +88,9 @@ def _read_additional_package(package: str) -> tuple[str, str]:
     """NAME/VERSION of a package listed in data/extensions/additional, read from its .pm when it can be
     found on the lib path; otherwise the package's last component and version 0."""
     rel = os.path.join(*package.split("::")) + ".pm"
-    sources = [p for p in (os.path.join(d, rel) for d in LIB_DIRS) if os.path.exists(p)]
-    name, ext_version = _read_name_and_version(sources) if sources else (None, "0")
+    # like @INC: only the first match is the one Perl loads
+    source = next((p for p in (os.path.join(d, rel) for d in LIB_DIRS) if os.path.exists(p)), None)
+    name, ext_version = _read_name_and_version([source]) if source else (None, "0")
     return name or package.rsplit("::", 1)[-1], ext_version
 
 
