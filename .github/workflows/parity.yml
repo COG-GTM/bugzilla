@@ -4,7 +4,6 @@ on:
   push:
     branches: [ 5.2, migration/python ]
   pull_request:
-    branches: [ 5.2, migration/python ]
   workflow_dispatch:
 
 jobs:
