@@ -21,6 +21,7 @@ $answer{'interdiffbin'}         = '/usr/bin/interdiff';
 $answer{'user_info_class'}      = 'CGI';
 $answer{'user_verify_class'}    = 'DB';
 $answer{'use_mailer_queue'}     = 0;
+$answer{'mail_delivery_method'} = 'None';
 $answer{'useclassification'}    = 1;
 $answer{'usebugaliases'}        = 1;
 $answer{'upgrade_notification'} = 'disabled';

@@ -1,10 +1,12 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND noninteractive
+ENV TZ Etc/UTC
 
 RUN apt-get update && apt-get -y dist-upgrade
 RUN apt-get -y install \
  apache2 \
+ tzdata \
  mariadb-client \
  netcat-traditional \
  libappconfig-perl \
