@@ -1,0 +1,25 @@
+{
+  "body": {
+    "attachments": {},
+    "bugs": {
+      "<id:1>": [
+        {
+          "bug_id": "<id>",
+          "content_type": "text/plain",
+          "creation_time": "<datetime>",
+          "creator": "<admin-email>",
+          "file_name": "hello.txt",
+          "flags": [],
+          "id": "<id>",
+          "is_obsolete": 0,
+          "is_patch": 0,
+          "is_private": 0,
+          "last_change_time": "<datetime>",
+          "size": 5,
+          "summary": "parity attachment"
+        }
+      ]
+    }
+  },
+  "status": 200
+}

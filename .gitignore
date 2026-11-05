@@ -10,3 +10,9 @@
 /localconfig
 /index.html
 .DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+parity/parity-results.xml

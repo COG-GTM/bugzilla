@@ -1,0 +1,13 @@
+{
+  "body": {
+    "values": [
+      "Highest",
+      "High",
+      "Normal",
+      "Low",
+      "Lowest",
+      "---"
+    ]
+  },
+  "status": 200
+}

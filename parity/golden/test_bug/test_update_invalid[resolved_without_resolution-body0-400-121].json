@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 121,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "A valid resolution is required to mark bugs as RESOLVED."
+  },
+  "status": 400
+}

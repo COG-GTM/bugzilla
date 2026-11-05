@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 50,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "You must select/enter a OS."
+  },
+  "status": 400
+}

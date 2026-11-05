@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 606,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "The file you are trying to attach is empty, does not exist, or you don't have permission to read it."
+  },
+  "status": 400
+}

@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 123,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "You are not allowed to file new bugs with the VERIFIED status."
+  },
+  "status": 400
+}

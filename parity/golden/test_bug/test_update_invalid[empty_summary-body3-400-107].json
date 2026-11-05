@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 107,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "You must enter a summary for this bug."
+  },
+  "status": 400
+}

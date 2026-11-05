@@ -1,0 +1,22 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "alias": [],
+        "changes": {
+          "priority": {
+            "added": "High",
+            "removed": "Normal"
+          },
+          "severity": {
+            "added": "major",
+            "removed": "normal"
+          }
+        },
+        "id": "<id>",
+        "last_change_time": "<datetime>"
+      }
+    ]
+  },
+  "status": 200
+}

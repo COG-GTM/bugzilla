@@ -1,0 +1,24 @@
+{
+  "body": {
+    "bugs": {
+      "<id:1>": {
+        "comments": [
+          {
+            "attachment_id": null,
+            "bug_id": "<id>",
+            "count": 0,
+            "creation_time": "<datetime>",
+            "creator": "<admin-email>",
+            "id": "<id>",
+            "is_private": false,
+            "tags": [],
+            "text": "Initial description.",
+            "time": "<datetime>"
+          }
+        ]
+      }
+    },
+    "comments": {}
+  },
+  "status": 200
+}

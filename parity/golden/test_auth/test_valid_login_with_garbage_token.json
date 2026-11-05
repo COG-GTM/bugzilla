@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 32000,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "The cookies or token provide were not valid or have expired. You may login again to get new cookies or a new token."
+  },
+  "status": 400
+}

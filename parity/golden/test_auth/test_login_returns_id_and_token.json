@@ -1,0 +1,7 @@
+{
+  "body": {
+    "id": "<id>",
+    "token": "<token>"
+  },
+  "status": 200
+}

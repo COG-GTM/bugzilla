@@ -1,0 +1,57 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "alias": [],
+        "assigned_to": "<admin-email>",
+        "assigned_to_detail": {
+          "email": "<admin-email>",
+          "id": "<id>",
+          "name": "<admin-email>",
+          "real_name": "<admin-name>"
+        },
+        "blocks": [],
+        "cc": [],
+        "cc_detail": [],
+        "classification": "Unclassified",
+        "component": "Core",
+        "creation_time": "<datetime>",
+        "creator": "<admin-email>",
+        "creator_detail": {
+          "email": "<admin-email>",
+          "id": "<id>",
+          "name": "<admin-email>",
+          "real_name": "<admin-name>"
+        },
+        "deadline": null,
+        "depends_on": [],
+        "dupe_of": null,
+        "flags": [],
+        "groups": [],
+        "id": "<id>",
+        "is_cc_accessible": true,
+        "is_confirmed": true,
+        "is_creator_accessible": true,
+        "is_open": true,
+        "keywords": [],
+        "last_change_time": "<datetime>",
+        "op_sys": "All",
+        "platform": "All",
+        "priority": "Normal",
+        "product": "Parity Product",
+        "qa_contact": "",
+        "resolution": "",
+        "see_also": [],
+        "severity": "normal",
+        "status": "CONFIRMED",
+        "summary": "Minimal bug <run>",
+        "target_milestone": "---",
+        "url": "",
+        "version": "1.0",
+        "whiteboard": ""
+      }
+    ],
+    "faults": []
+  },
+  "status": 200
+}

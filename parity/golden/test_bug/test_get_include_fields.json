@@ -1,0 +1,13 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "id": "<id>",
+        "status": "CONFIRMED",
+        "summary": "Include fields <run>"
+      }
+    ],
+    "faults": []
+  },
+  "status": 200
+}

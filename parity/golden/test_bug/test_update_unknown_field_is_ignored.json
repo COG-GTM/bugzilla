@@ -1,0 +1,13 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "alias": [],
+        "changes": {},
+        "id": "<id>",
+        "last_change_time": "<datetime>"
+      }
+    ]
+  },
+  "status": 200
+}

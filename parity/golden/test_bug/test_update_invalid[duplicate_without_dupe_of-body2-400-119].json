@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 119,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "You must specify a bug id to mark this bug as a duplicate of."
+  },
+  "status": 400
+}

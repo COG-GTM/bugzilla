@@ -1,0 +1,12 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "id": "<id>",
+        "summary": "Exclude wins <run>"
+      }
+    ],
+    "faults": []
+  },
+  "status": 200
+}

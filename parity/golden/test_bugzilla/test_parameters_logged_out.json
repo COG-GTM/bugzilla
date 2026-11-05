@@ -1,0 +1,9 @@
+{
+  "body": {
+    "parameters": {
+      "maintainer": "<admin-email>",
+      "requirelogin": "0"
+    }
+  },
+  "status": 200
+}

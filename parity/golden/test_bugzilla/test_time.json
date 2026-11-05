@@ -1,0 +1,11 @@
+{
+  "body": {
+    "db_time": "<datetime>",
+    "tz_name": "UTC",
+    "tz_offset": "+0000",
+    "tz_short_name": "UTC",
+    "web_time": "<datetime>",
+    "web_time_utc": "<datetime>"
+  },
+  "status": 200
+}

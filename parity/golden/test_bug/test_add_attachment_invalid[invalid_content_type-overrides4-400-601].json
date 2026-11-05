@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 601,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "The content type bogus is invalid. Valid types must be of the form foo/bar where foo is one of application, audio, image, message, model, multipart, text, video and bar must not contain any special characters (such as \"=\", \"?\", ...)."
+  },
+  "status": 400
+}

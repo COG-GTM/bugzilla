@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 504,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "The name nobody@bugzilla.test is not a valid username. Either you misspelled it, or the person has not registered for a Bugzilla account."
+  },
+  "status": 401
+}

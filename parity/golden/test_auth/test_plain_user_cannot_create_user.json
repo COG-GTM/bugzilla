@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 304,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "Sorry, you aren't a member of the 'editusers' group, and so you are not authorized to add new users."
+  },
+  "status": 401
+}

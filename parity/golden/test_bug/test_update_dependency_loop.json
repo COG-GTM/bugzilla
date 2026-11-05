@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 116,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "The following bug(s) would appear on both the \"depends on\" and \"blocks\" parts of the dependency tree if these changes are committed: <n>. This would create a circular dependency, which is not allowed."
+  },
+  "status": 400
+}

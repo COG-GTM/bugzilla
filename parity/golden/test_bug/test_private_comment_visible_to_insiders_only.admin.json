@@ -1,0 +1,36 @@
+{
+  "body": {
+    "bugs": {
+      "<id:1>": {
+        "comments": [
+          {
+            "attachment_id": null,
+            "bug_id": "<id>",
+            "count": 0,
+            "creation_time": "<datetime>",
+            "creator": "<admin-email>",
+            "id": "<id>",
+            "is_private": false,
+            "tags": [],
+            "text": "Created by the REST parity suite.",
+            "time": "<datetime>"
+          },
+          {
+            "attachment_id": null,
+            "bug_id": "<id>",
+            "count": 1,
+            "creation_time": "<datetime>",
+            "creator": "<admin-email>",
+            "id": "<id>",
+            "is_private": true,
+            "tags": [],
+            "text": "Insider only.",
+            "time": "<datetime>"
+          }
+        ]
+      }
+    },
+    "comments": {}
+  },
+  "status": 200
+}

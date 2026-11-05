@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 113,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "Sorry, but you are not allowed to (un)mark comments or attachments as private."
+  },
+  "status": 401
+}
