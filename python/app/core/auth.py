@@ -53,6 +53,8 @@ def load_user(db: Session, user_id: int) -> User | None:
                      {"id": user_id}).first()
     if not row:
         return None
+    if not row.is_enabled:
+        raise BugzillaError("account_disabled", f"The user account {row.login_name} is disabled.")
     group_ids = user_group_ids(db, user_id)
     names = set()
     if group_ids:

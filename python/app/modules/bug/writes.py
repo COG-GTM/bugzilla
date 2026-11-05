@@ -300,13 +300,61 @@ def apply_list_change(current: list, change: dict) -> list:
 
 
 def dep_ids(ctx: Ctx, values, field: str) -> list[int]:
+    """Bugzilla::Bug::_check_dependencies: every added/removed id must exist AND be visible to the caller."""
     out = []
     for v in values:
         for part in re.split(r"[\s,]+", str(v)) if isinstance(v, str) else [v]:
             if part == "" or part is None:
                 continue
-            out.append(find_bug(ctx.db, part, field)["bug_id"])
+            out.append(check_bug(ctx, part)["bug_id"])
     return out
+
+
+def check_dependency_loops(db: Session, bug_id: int, dependson: list[int], blocked: list[int]):
+    """Bugzilla::Bug::ValidateDependencies: reject direct and indirect cycles."""
+    if bug_id in dependson or bug_id in blocked:
+        raise BugzillaError("dependency_loop_single", "You can't make a bug block or depend on itself.")
+    edges: dict[int, set[int]] = {}
+    for blk, dep in db.execute(text("SELECT blocked, dependson FROM dependencies")):
+        if blk == bug_id or dep == bug_id:
+            continue
+        edges.setdefault(blk, set()).add(dep)  # blk depends on dep
+    edges[bug_id] = set(dependson)
+    for blk in blocked:
+        edges.setdefault(blk, set()).add(bug_id)
+    seen, todo = set(), list(edges.get(bug_id, ()))
+    while todo:
+        n = todo.pop()
+        if n == bug_id:
+            raise BugzillaError("dependency_loop_multi", "The following bugs would appear in both the \"depends on\" "
+                                "and \"blocks\" parts of the dependency tree if these changes are committed: "
+                                f"{', '.join(str(b) for b in sorted(seen))}. This would create a circular dependency, "
+                                "which is not allowed.")
+        if n in seen:
+            continue
+        seen.add(n)
+        todo.extend(edges.get(n, ()))
+
+
+def mandatory_groups(db: Session, user: User, product_id: int) -> list[int]:
+    """group_control_map rows whose membercontrol (member) / othercontrol (non-member) is MANDATORY (3)."""
+    out = []
+    for gid, member, other in db.execute(text(
+            "SELECT group_id, membercontrol, othercontrol FROM group_control_map WHERE product_id = :p"),
+            {"p": product_id}):
+        if (gid in user.group_ids and member == 3) or (gid not in user.group_ids and other == 3):
+            out.append(gid)
+    return out
+
+
+def check_can_change(ctx: Ctx, row):
+    """Bugzilla::Bug::check_can_change_field, reduced: editbugs can change anything; otherwise only the
+    reporter, assignee or QA contact may edit the bug."""
+    user = ctx.user
+    if user.in_group("editbugs") or user.id in (row["reporter"], row["assigned_to"], row["qa_contact"]):
+        return
+    raise BugzillaError("illegal_change", "You tried to change a field of this bug, but only the assignee or reporter "
+                        "of the bug, or a user with the required permissions may change that field.")
 
 
 # ---------------------------------------------------------------- Bug.create
@@ -369,6 +417,9 @@ def create(ctx: Ctx) -> dict:
 
     dependson = dep_ids(ctx, as_list(p.get("dependson")), "dependson") if editbugs else []
     blocked = dep_ids(ctx, as_list(p.get("blocked")), "blocked") if editbugs else []
+    if dependson or blocked:
+        check_dependency_loops(db, 0, dependson, blocked)
+    group_ids = mandatory_groups(db, user, product["id"])
     keyword_ids = []
     for kw in as_list(p.get("keywords")):
         for name in (re.split(r"[\s,]+", kw) if isinstance(kw, str) else [kw]):
@@ -408,6 +459,8 @@ def create(ctx: Ctx) -> dict:
          "resolution": resolution, "milestone": milestone, "qa_contact": qa_contact, "whiteboard": whiteboard,
          "everconfirmed": everconfirmed, "ra": reporter_accessible, "ca": cclist_accessible})
     bug_id = db.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+    for gid in group_ids:
+        db.execute(text("INSERT INTO bug_group_map (bug_id, group_id) VALUES (:b, :g)"), {"b": bug_id, "g": gid})
     for uid in cc_ids:
         db.execute(text("INSERT INTO cc (bug_id, who) VALUES (:b, :w)"), {"b": bug_id, "w": uid})
     for kid in keyword_ids:
@@ -463,6 +516,8 @@ def _update_one(ctx: Ctx, row, p: dict) -> dict:
     comments_to_add: list[dict] = []
     ts = db_now(db)
 
+    if any(k not in ("comment",) for k in p):
+        check_can_change(ctx, row)
     comment = p.pop("comment", None)
     if comment is not None:
         if isinstance(comment, dict):
@@ -565,10 +620,10 @@ def _update_one(ctx: Ctx, row, p: dict) -> dict:
         if field in p:
             current = dependson_of(db, bug_id) if field == "dependson" else blocked_of(db, bug_id)
             change = {k: dep_ids(ctx, v, field) for k, v in list_change(p[field]).items()}
-            wanted = apply_list_change(current, change)
-            if bug_id in wanted:
-                raise BugzillaError("dependency_loop_single", "You can't make a bug block or depend on itself.")
-            dep_changes[field] = (current, wanted)
+            dep_changes[field] = (current, apply_list_change(current, change))
+    if dep_changes:
+        check_dependency_loops(db, bug_id, dep_changes.get("dependson", (None, dependson_of(db, bug_id)))[1],
+                               dep_changes.get("blocked", (None, blocked_of(db, bug_id)))[1])
     if "keywords" in p:
         current = keywords_of(db, bug_id)
         names = {k: [n for x in v for n in (re.split(r"[\s,]+", x) if isinstance(x, str) else [x]) if trim(n)]

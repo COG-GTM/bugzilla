@@ -45,6 +45,8 @@ async def bugzilla_error(request: Request, exc: BugzillaError):
 @app.exception_handler(StarletteHTTPException)
 async def http_error(request: Request, exc: StarletteHTTPException):
     if exc.status_code in (404, 405):
+        if settings.perl_upstream and request.url.path.startswith(settings.rest_prefix):
+            return await forward_to_perl(request)
         return error_response(request, rest_resource_not_found(request.method, request.url.path.removeprefix(
             settings.rest_prefix)))
     return error_response(request, BugzillaError("unknown_error", str(exc.detail), code=32000))
@@ -53,6 +55,28 @@ async def http_error(request: Request, exc: StarletteHTTPException):
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, exc: RequestValidationError):
     return error_response(request, BugzillaError("param_required", str(exc), code=50))
+
+
+HOP_HEADERS = {"connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade", "proxy-authorization",
+               "proxy-authenticate", "content-length", "host"}
+
+
+async def forward_to_perl(request: Request):
+    """Routes not (yet) ported stay on Perl even when Apache already proxies the whole prefix to us
+    (e.g. PUT /bug/attachment/{id}, /bug/comment/tags/*)."""
+    import httpx
+    from fastapi.responses import Response
+
+    url = settings.perl_upstream.rstrip("/") + request.url.path
+    if request.url.query:
+        url += "?" + request.url.query
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in HOP_HEADERS}
+    headers["X-Bugzilla-Strangler"] = "python-fallback"
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        upstream = await client.request(request.method, url, content=await request.body(), headers=headers)
+    out_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP_HEADERS}
+    out_headers["X-Bugzilla-Backend"] = "perl-fallback"
+    return Response(upstream.content, status_code=upstream.status_code, headers=out_headers)
 
 
 @app.get("/healthz", include_in_schema=False)

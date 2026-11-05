@@ -381,13 +381,16 @@ def search(ctx: Ctx) -> dict:
     sql += " ORDER BY " + (", ".join(order_sql) + ", b.bug_id" if order_sql else "b.bug_id")
     max_results = to_int(param("max_search_results"), 10000)
     lim = to_int(limit)
-    if lim is None or lim > max_results:
-        lim = max_results
-    if lim:
-        sql += f" LIMIT {lim}"
-        off = to_int(offset)
-        if off:
-            sql += f" OFFSET {off}"
+    if lim == 0:
+        pass  # Perl: limit=0 means "no limit" and drops offset too
+    else:
+        if lim is None or lim > max_results:
+            lim = max_results
+        if lim:
+            sql += f" LIMIT {lim}"
+            off = to_int(offset)
+            if off:
+                sql += f" OFFSET {off}"
     rows = ctx.db.execute(text(sql), binds).mappings().all()
     return {"bugs": [bug_to_hash(ctx, r) for r in rows]}
 

@@ -7,6 +7,7 @@ into one hash, credential renaming, include/exclude_fields splitting, JSONP via
 """
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -47,9 +48,6 @@ class Ctx:
 
 async def merged_params(request: Request) -> dict[str, Any]:
     params: dict[str, Any] = {}
-    for key in request.query_params.keys():
-        values = request.query_params.getlist(key)
-        params[key] = values if len(values) > 1 else values[0]
     body = await request.body()
     if body:
         try:
@@ -58,6 +56,10 @@ async def merged_params(request: Request) -> dict[str, Any]:
             raise BugzillaError("json_rpc_invalid_params", "The JSON body is not valid.", code=32602)
         if isinstance(data, dict):
             params.update(data)
+    # Perl merges the JSON body first and then overlays the query string, so ?priority=High wins
+    for key in request.query_params.keys():
+        values = request.query_params.getlist(key)
+        params[key] = values if len(values) > 1 else values[0]
     has_login_pair = "login" in params and "password" in params
     for raw, bz in CREDENTIAL_RENAMES.items():
         if raw in params and (has_login_pair or raw not in ("login", "password")):
@@ -69,7 +71,11 @@ async def merged_params(request: Request) -> dict[str, Any]:
 async def context(request: Request, db: Session = Depends(get_db)) -> Ctx:
     params = await merged_params(request)
     user = authenticate(db, params) if any(k in params for k in CREDENTIAL_RENAMES.values()) else ANONYMOUS
-    request.state.callback = params.get("callback")
+    callback = params.get("callback")
+    if callback is not None and not re.match(r"^[\w.\[\]]+$", str(callback)):
+        raise BugzillaError("json_rpc_invalid_callback", "You specified an invalid callback name. Callback names "
+                            "may only contain letters, numbers, underscores, dots and square brackets.")
+    request.state.callback = callback
     return Ctx(request=request, db=db, params=params, user=user, filter=Filter.from_params(params))
 
 
@@ -78,8 +84,8 @@ def json_response(request: Request, payload: Any, status: int = 200) -> Response
     headers = {"Access-Control-Allow-Origin": "*", "X-Bugzilla-Backend": "python",
                "Access-Control-Allow-Headers": "origin, content-type, accept, x-requested-with",
                "ETag": '"' + hashlib.md5(body.encode()).hexdigest() + '"'}
-    callback = getattr(request.state, "callback", None) or request.query_params.get("callback")
-    if callback:
+    callback = getattr(request.state, "callback", None)
+    if callback and re.match(r"^[\w.\[\]]+$", str(callback)):
         return Response(f"/**/{callback}({body})", status_code=status, media_type="text/javascript",
                         headers=headers)
     return Response(body, status_code=status, media_type="application/json", headers=headers)

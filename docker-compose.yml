@@ -45,7 +45,14 @@ services:
       - 8000:8000
     depends_on:
       - bugzilla5.db
-    environment: *bugzilla_env
+    environment:
+      - BZ_DB_HOST=bugzilla5.db
+      - BZ_DB_PORT=3306
+      - BZ_DB_USER=bugs
+      - BZ_DB_NAME=bugs
+      - BZ_DB_PASS=bugzilla
+      # unported /rest.cgi resources are forwarded back to Perl (strangler safety net)
+      - BZ_PERL_UPSTREAM=http://bugzilla5.web:80
 
   bugzilla5.db:
     build:

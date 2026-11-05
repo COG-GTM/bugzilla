@@ -11,6 +11,8 @@ class Settings:
     db_name: str = os.environ.get("BZ_DB_NAME", "bugs")
     # Perl's data/params.json; mounted read-only from the bugzilla5-data-dir volume.
     params_path: str = os.environ.get("BZ_PARAMS_PATH", "/var/www/html/data/params.json")
+    # Perl upstream used for /rest.cgi resources the Python service does not implement yet
+    perl_upstream: str = os.environ.get("BZ_PERL_UPSTREAM", "")
     rest_prefix: str = os.environ.get("BZ_REST_PREFIX", "/rest.cgi")
     version: str = os.environ.get("BZ_VERSION", "5.2+")
 
