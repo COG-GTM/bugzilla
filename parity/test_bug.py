@@ -89,8 +89,8 @@ def test_legal_values_version_requires_product(api: Api, snapshot):
     snapshot(resp)
 
 
-def test_legal_values_version_for_product(api: Api, admin: str, product: dict, snapshot):
-    found = api.get("/product", params={"names": product["product"], "include_fields": "id"}, token=admin)
+def test_legal_values_version_for_product(api: Api, fixture_api: Api, admin: str, product: dict, snapshot):
+    found = fixture_api.get("/product", params={"names": product["product"], "include_fields": "id"}, token=admin)
     product_id = found.body["products"][0]["id"]
     resp = api.get(f"/field/bug/version/{product_id}/values")
     assert resp.status == 200

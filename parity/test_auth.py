@@ -141,13 +141,14 @@ def test_plain_user_can_create_and_read(api: Api, user: dict, make_bug):
     assert resp.body["bugs"][0]["id"] == bug_id and resp.body["bugs"][0]["creator"] == user["email"]
 
 
-def test_plain_user_cannot_create_product(api: Api, user: dict, snapshot):
-    resp = api.post("/product", {"name": "Forbidden", "description": "x", "version": "1"}, token=user["token"])
+def test_plain_user_cannot_create_product(fixture_api: Api, user: dict, snapshot):
+    # Product.create is not migrated yet: exercised on the engine that owns it.
+    resp = fixture_api.post("/product", {"name": "Forbidden", "description": "x", "version": "1"}, token=user["token"])
     assert_error(resp, 401, 304)
     snapshot(resp)
 
 
-def test_plain_user_cannot_create_user(api: Api, user: dict, snapshot):
-    resp = api.post("/user", {"email": "x@bugzilla.test", "password": "Passw0rd!!"}, token=user["token"])
+def test_plain_user_cannot_create_user(fixture_api: Api, user: dict, snapshot):
+    resp = fixture_api.post("/user", {"email": "x@bugzilla.test", "password": "Passw0rd!!"}, token=user["token"])
     assert_error(resp, 401, 304)
     snapshot(resp)

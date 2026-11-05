@@ -13,8 +13,11 @@ PYTEST_ARGS ?=
 
 ifeq ($(TARGET),perl)
   BASE_URL := $(PERL_BASE_URL)
+  FIXTURE_BASE_URL := $(PERL_BASE_URL)
 else ifeq ($(TARGET),python)
   BASE_URL := $(PYTHON_BASE_URL)
+  # Product/Component/User are not migrated yet: fixtures are created through Perl.
+  FIXTURE_BASE_URL := $(PERL_BASE_URL)
 else
   $(error TARGET must be "perl" or "python", got "$(TARGET)")
 endif
@@ -26,7 +29,7 @@ parity-deps:
 
 parity:
 	@echo "parity: TARGET=$(TARGET) BASE_URL=$(BASE_URL)"
-	cd parity && BASE_URL=$(BASE_URL) $(PYTHON) -m pytest $(PYTEST_ARGS)
+	cd parity && BASE_URL=$(BASE_URL) FIXTURE_BASE_URL=$(FIXTURE_BASE_URL) $(PYTHON) -m pytest $(PYTEST_ARGS)
 
 parity-update-golden:
 	@test "$(TARGET)" = perl || { echo "golden files may only be recorded from the Perl app (TARGET=perl)"; exit 1; }

@@ -21,6 +21,9 @@ import pytest
 from normalize import dumps, normalize_response
 
 BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:8080/rest.cgi").rstrip("/")
+# Fixtures (product/component/user) are created through the Perl source of truth while a
+# target only serves the migrated slices; defaults to BASE_URL so Perl runs are unaffected.
+FIXTURE_BASE_URL = os.environ.get("FIXTURE_BASE_URL", BASE_URL).rstrip("/")
 ADMIN_EMAIL = os.environ.get("BZ_ADMIN_EMAIL", "admin@bugzilla.test")
 ADMIN_PASSWORD = os.environ.get("BZ_ADMIN_PASSWORD", "password01!")
 ADMIN_REALNAME = os.environ.get("BZ_ADMIN_REALNAME", "Test Admin")
@@ -133,8 +136,15 @@ def admin(api: Api) -> str:
 
 
 @pytest.fixture(scope="session")
-def product(api: Api, admin: str) -> dict[str, str]:
+def fixture_api() -> Api:
+    """Client for the engine that owns the not-yet-migrated resources (Product, Component, User)."""
+    return Api(FIXTURE_BASE_URL)
+
+
+@pytest.fixture(scope="session")
+def product(fixture_api: Api, admin: str) -> dict[str, str]:
     """Idempotently create the product/component the suite files bugs into."""
+    api = fixture_api
     existing = api.get("/product", params={"names": PRODUCT, "include_fields": "name,components"}, token=admin)
     assert existing.status == 200, existing.body
     if not existing.body["products"]:
@@ -169,11 +179,11 @@ def product(api: Api, admin: str) -> dict[str, str]:
 
 
 @pytest.fixture(scope="session")
-def user(api: Api, admin: str) -> dict[str, str]:
+def user(api: Api, fixture_api: Api, admin: str) -> dict[str, str]:
     """A plain (non-admin) user that exists on both engines."""
-    found = api.get("/user", params={"names": USER_EMAIL}, token=admin)
+    found = fixture_api.get("/user", params={"names": USER_EMAIL}, token=admin)
     if found.status != 200 or not found.body.get("users"):
-        created = api.post(
+        created = fixture_api.post(
             "/user", {"email": USER_EMAIL, "full_name": USER_NAME, "password": USER_PASSWORD}, token=admin
         )
         assert created.status == 201, created.body

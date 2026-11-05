@@ -1,0 +1,17 @@
+[project]
+name = "bugzilla-api"
+version = "0.1.0"
+description = "Python (FastAPI) port of the Bugzilla REST API, module by module, on the unchanged MariaDB schema."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
+  "sqlalchemy>=2.0,<3",
+  "pymysql>=1.1,<2",
+  "cryptography>=42",
+  "pydantic>=2,<3",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
