@@ -1,0 +1,8 @@
+# Bugzilla module (Bugzilla::WebService::Bugzilla): REST path prefixes (regex, relative to /rest.cgi/) served by Python.
+# docker/startup.sh turns each line into a ProxyPassMatch anchored as ^/rest.cgi/(<prefix>)(/.*)?$, so `time` does not swallow `timezone`.
+version
+extensions
+timezone
+time
+last_audit_time
+parameters
