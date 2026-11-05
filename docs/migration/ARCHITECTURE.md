@@ -340,15 +340,15 @@ sequenceDiagram
     else no/invalid cookie, form has Bugzilla_login + Bugzilla_password (+ Bugzilla_login_token CSRF)
         St-->>Bz: {username, password}
         Bz->>Vf: check_credentials()
-        Vf->>DB: SELECT … FROM profiles WHERE login_name=?; INSERT/DELETE login_failure (MAX_LOGIN_ATTEMPTS=5, lockout 30 min)
+        Vf->>DB: SELECT … FROM profiles WHERE login_name=? then INSERT/DELETE login_failure (MAX_LOGIN_ATTEMPTS=5, lockout 30 min)
         Vf-->>Bz: {user_id} or AUTH_LOGINFAILED / AUTH_LOCKOUT / AUTH_DISABLED
         Bz->>Pc: persist_login()
-        Pc->>DB: INSERT INTO logincookies (cookie, userid, ipaddr, lastused); DELETE stale (>30 days)
-        Pc-->>Br: Set-Cookie Bugzilla_login, Bugzilla_logincookie (HttpOnly; session or persistent per rememberlogin)
+        Pc->>DB: INSERT INTO logincookies (cookie, userid, ipaddr, lastused) and DELETE stale (>30 days)
+        Pc-->>Br: Set-Cookie Bugzilla_login, Bugzilla_logincookie (HttpOnly, session or persistent per rememberlogin)
     else nothing and LOGIN_REQUIRED
         Bz-->>Br: login form (Auth::Login::CGI->fail_nodata) / error 410 for webservices
     end
-    Bz-->>Ap: Bugzilla->user (also checks sudo cookie, updates profiles.last_seen_date)
+    Bz-->>Ap: Bugzilla->user (also checks sudo cookie and updates profiles.last_seen_date)
 ```
 
 ### 5.3 Web-service (REST) flow
