@@ -111,6 +111,14 @@ def test_get_membership(api, admin_token, new_group):
     assert admin["membership"] == [ADMIN]
 
 
+def test_create_regexp_perl_dialect(api, admin_token, new_group):
+    # Perl validates with qr// — named groups, \p{..} etc. must be accepted and drive membership
+    gid, name = new_group(user_regexp="^(?<u>ALICE)\\.ng@\\p{L}+\\.test$")
+    (g,) = get_groups(api, admin_token, ids=gid, membership=1)
+    assert g["user_regexp"] == "^(?<u>ALICE)\\.ng@\\p{L}+\\.test$"
+    assert [m["name"] for m in g["membership"]] == ["admin@bugzilla.test", "alice.ng@bugzilla.test"]
+
+
 @pytest.mark.parametrize("value", ["0", ""])
 def test_get_membership_false_values(api, admin_token, value):
     (g,) = get_groups(api, admin_token, ids=1, membership=value)

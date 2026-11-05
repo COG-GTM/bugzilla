@@ -1,9 +1,11 @@
 """Group.get / Group.create / Group.update — port of Bugzilla/WebService/Group.pm plus the parts of
 Bugzilla/Group.pm (validators, admin inheritance, regexp membership, audit log) and Bugzilla/User.pm
 (bless / visibility helpers) that the WebService exercises."""
+
 import re
 
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from app.core.errors import BugzillaError
 from app.core.params import param
@@ -191,14 +193,18 @@ def check_description(desc) -> str:
     return desc
 
 
-def check_user_regexp(regexp) -> str:
+def check_user_regexp(ctx: Ctx, regexp) -> str:
     regexp = trim(regexp)
     if not perl_true(regexp):
         regexp = ""
-    try:
-        re.compile(regexp)
-    except re.error:
-        raise BugzillaError("invalid_regexp", "The regular expression you entered is invalid.")
+    if regexp != "":
+        try:
+            # Perl validates with qr//; MariaDB's PCRE2 engine is the closest match to Perl's regex
+            # dialect we have (\p{..}, \k<..>, \z, possessive quantifiers ...), and _rederive_regexp
+            # below matches with the same engine, so accept/reject and membership stay consistent.
+            ctx.db.execute(text("SELECT '' REGEXP :re"), {"re": regexp})
+        except DBAPIError:
+            raise BugzillaError("invalid_regexp", "The regular expression you entered is invalid.")
     return regexp
 
 
@@ -216,13 +222,14 @@ def audit_log(ctx: Ctx, gid: int, field: str, removed, added):
 
 def rederive_regexp(ctx: Ctx, gid: int, regexp: str):
     """Bugzilla::Group::_rederive_regexp: sync the GRANT_REGEXP rows of user_group_map with the regexp."""
+    # Perl: ($regexp ne '') && ($login =~ m/$regexp/i)
     rows = ctx.db.execute(text(
-        "SELECT userid, login_name, group_id FROM profiles LEFT JOIN user_group_map "
+        "SELECT userid, group_id, (:re <> '' AND login_name REGEXP CONCAT('(?i)', :re)) AS matched "
+        "FROM profiles LEFT JOIN user_group_map "
         "ON user_group_map.user_id = profiles.userid AND group_id = :gid AND grant_type = :gt AND isbless = 0"),
-        {"gid": gid, "gt": GRANT_REGEXP}).all()
-    compiled = re.compile(regexp, re.IGNORECASE) if regexp != "" else None
-    for uid, login, present in rows:
-        matches = compiled is not None and compiled.search(login) is not None
+        {"gid": gid, "gt": GRANT_REGEXP, "re": regexp}).all()
+    for uid, present, matched in rows:
+        matches = bool(matched)
         if matches and present is None:
             ctx.db.execute(text("INSERT INTO user_group_map (user_id, group_id, grant_type, isbless) "
                                 "VALUES (:uid, :gid, :gt, 0)"), {"uid": uid, "gid": gid, "gt": GRANT_REGEXP})
@@ -323,7 +330,7 @@ def create(ctx: Ctx) -> dict:
     isactive = 1 if perl_true(p.get("is_active")) else 0
     isbuggroup = 1
     name = check_name(ctx, p.get("name"))
-    userregexp = check_user_regexp(p.get("user_regexp"))
+    userregexp = check_user_regexp(ctx, p.get("user_regexp"))
 
     result = ctx.db.execute(text(
         "INSERT INTO groups (name, description, isbuggroup, userregexp, isactive, icon_url) "
@@ -391,7 +398,7 @@ def set_all(ctx: Ctx, group: dict, values: dict) -> dict:
         elif key == "description":
             new["description"] = check_description(value)
         elif key == "user_regexp":
-            new["userregexp"] = check_user_regexp(value)
+            new["userregexp"] = check_user_regexp(ctx, value)
         elif key == "is_active":
             new["isactive"] = 1 if perl_true(value) else 0
         elif key == "icon_url":
