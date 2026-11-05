@@ -14,7 +14,7 @@ implementation; copy its shape. Perl stays the source of truth: a module is done
 - Branch from `migration/python`. Only edit:
   - `parity/test_<module>.py` (new file, one per module)
   - `python/app/modules/<module>/{router.py,service.py,schemas.py,__init__.py}` (+ `writes.py` if large)
-  - one line in `docker/python-proxy-routes.txt`
+  - a new file `docker/python-proxy-routes.d/<module>.txt`
 - Never edit `python/app/core/*`, `parity/conftest.py`, `parity/normalize.py` or another module's
   folder. If you need a shared helper, message the coordinator with the exact diff you want.
 - Commit messages must contain `feature` or `bug`; PR description in Portuguese (repo rule) and
@@ -92,7 +92,7 @@ make parity-report                                       # endpoint | Perl | Pyt
 
 ## 5. Cut the routes over
 
-Add the module's path prefix(es) to `docker/python-proxy-routes.txt` (one regex alternative per
+Create `docker/python-proxy-routes.d/<module>.txt` with the module's path prefix(es) (one regex alternative per
 line, e.g. `product`, `field/bug`). `docker/startup.sh` turns them into `ProxyPassMatch` rules
 when `BZ_PYTHON_UPSTREAM=http://bugzilla5.python:8000` is set:
 

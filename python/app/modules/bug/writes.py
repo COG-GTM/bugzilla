@@ -340,7 +340,8 @@ def mandatory_groups(db: Session, user: User, product_id: int) -> list[int]:
     """group_control_map rows whose membercontrol (member) / othercontrol (non-member) is MANDATORY (3)."""
     out = []
     for gid, member, other in db.execute(text(
-            "SELECT group_id, membercontrol, othercontrol FROM group_control_map WHERE product_id = :p"),
+            "SELECT gcm.group_id, gcm.membercontrol, gcm.othercontrol FROM group_control_map gcm "
+            "JOIN groups g ON g.id = gcm.group_id WHERE gcm.product_id = :p AND g.isactive = 1"),
             {"p": product_id}):
         if (gid in user.group_ids and member == 3) or (gid not in user.group_ids and other == 3):
             out.append(gid)
@@ -516,7 +517,9 @@ def _update_one(ctx: Ctx, row, p: dict) -> dict:
     comments_to_add: list[dict] = []
     ts = db_now(db)
 
-    if any(k not in ("comment",) for k in p):
+    for transport_key in ("callback", "token", "Bugzilla_token", "Bugzilla_api_key", "Bugzilla_login", "Bugzilla_password"):
+        p.pop(transport_key, None)
+    if any(k != "comment" for k in p):
         check_can_change(ctx, row)
     comment = p.pop("comment", None)
     if comment is not None:
