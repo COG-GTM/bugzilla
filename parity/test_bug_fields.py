@@ -73,8 +73,8 @@ def test_legal_values_unknown_field(api):
     expect_error(api.get("/field/bug/nosuchfield/values"), 400, 108, 'Can\'t use "nosuchfield" as a field name.')
 
 
-def test_legal_values_product_specific_requires_product_id(api, admin_token):
-    pid = ok(api.get("/product", token=admin_token, params={"names": "Orbit CRM", "include_fields": "id"}))["products"][0]["id"]
+def test_legal_values_product_specific_requires_product_id(api, seed_product_id):
+    pid = seed_product_id
     assert ok(api.get(f"/field/bug/component/{pid}/values")) == {"values": ["Contacts", "Mobile App", "Pipeline"]}
     assert ok(api.get(f"/field/bug/version/{pid}/values")) == {"values": ["2.4"]}
 

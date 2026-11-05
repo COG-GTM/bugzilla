@@ -2,8 +2,6 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-version: '3.6'
-
 services:
   bugzilla5.web:
     build:
@@ -32,6 +30,29 @@ services:
       - BZ_DB_PASS=bugzilla
       - MARIADB_ROOT_HOST=%
       - MARIADB_ROOT_PASSWORD=bugzilla
+      # Set to http://bugzilla5.python:8000 to route the migrated REST routes to Python
+      # (docker/python-proxy-routes.txt); empty = pure Perl.
+      - BZ_PYTHON_UPSTREAM=${BZ_PYTHON_UPSTREAM:-}
+
+  bugzilla5.python:
+    build:
+      context: ./python
+      dockerfile: Dockerfile
+    volumes:
+      - bugzilla5-data-dir:/var/www/html/data:ro
+      - ./python/app:/srv/app:ro
+    ports:
+      - 8000:8000
+    depends_on:
+      - bugzilla5.db
+    environment:
+      - BZ_DB_HOST=bugzilla5.db
+      - BZ_DB_PORT=3306
+      - BZ_DB_USER=bugs
+      - BZ_DB_NAME=bugs
+      - BZ_DB_PASS=bugzilla
+      # unported /rest.cgi resources are forwarded back to Perl (strangler safety net)
+      - BZ_PERL_UPSTREAM=http://bugzilla5.web:8081
 
   bugzilla5.db:
     build:

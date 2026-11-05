@@ -86,6 +86,20 @@ def seed(api):
     return ids
 
 
+@pytest.fixture(scope="session")
+def seed_product_id(api, admin_token):
+    """Numeric id of the seeded product. Uses Product.get when that module is available on the
+    target and otherwise discovers it through Bug.legal_values (the Product module is a later slice)."""
+    r = api.get("/product", token=admin_token, params={"names": SEED_PRODUCT, "include_fields": "id"})
+    if r.status_code == 200:
+        return r.json()["products"][0]["id"]
+    for pid in range(1, 50):
+        r = api.get(f"/field/bug/component/{pid}/values")
+        if r.status_code == 200 and SEED_COMPONENT in r.json()["values"]:
+            return pid
+    pytest.fail(f"could not determine the id of product {SEED_PRODUCT!r}")
+
+
 def unique(prefix="parity"):
     return f"{prefix} {uuid.uuid4().hex[:10]}"
 
