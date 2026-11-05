@@ -1,7 +1,7 @@
 {
   "body": {
     "parameters": {
-      "maintainer": "admin@bugzilla.test",
+      "maintainer": "<admin-email>",
       "requirelogin": "0"
     }
   },

@@ -29,12 +29,12 @@
         "classification": "Unclassified",
         "component": "Core",
         "creation_time": "<datetime>",
-        "creator": "admin@bugzilla.test",
+        "creator": "<admin-email>",
         "creator_detail": {
-          "email": "admin@bugzilla.test",
+          "email": "<admin-email>",
           "id": "<id>",
-          "name": "admin@bugzilla.test",
-          "real_name": "Test Admin"
+          "name": "<admin-email>",
+          "real_name": "<admin-name>"
         },
         "deadline": null,
         "depends_on": [

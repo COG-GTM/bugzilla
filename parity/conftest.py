@@ -23,6 +23,9 @@ from normalize import dumps, normalize_response
 BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:8080/rest.cgi").rstrip("/")
 ADMIN_EMAIL = os.environ.get("BZ_ADMIN_EMAIL", "admin@bugzilla.test")
 ADMIN_PASSWORD = os.environ.get("BZ_ADMIN_PASSWORD", "password01!")
+ADMIN_REALNAME = os.environ.get("BZ_ADMIN_REALNAME", "Test Admin")
+# Configurable identity is blurred in snapshots so goldens do not depend on docker-compose.yml.
+IDENTITY_REPLACEMENTS = {ADMIN_EMAIL: "<admin-email>", ADMIN_REALNAME: "<admin-name>"}
 
 PRODUCT = "Parity Product"
 COMPONENT = "Core"
@@ -80,10 +83,11 @@ class Api:
         headers: dict[str, str] | None = None,
     ) -> Response:
         query: dict[str, Any] = dict(params or {})
-        if token is not None:
-            query["token"] = token
-        if api_key is not None:
-            query["api_key"] = api_key
+        credentials = {k: v for k, v in (("token", token), ("api_key", api_key)) if v is not None}
+        if credentials and isinstance(json_body, dict):
+            json_body = {**json_body, **credentials}  # keep credentials out of access logs
+        else:
+            query.update(credentials)
         resp = self._client.request(
             method,
             f"{self.base_url}{path}",
@@ -223,7 +227,7 @@ def snapshot(request: pytest.FixtureRequest, run_id: str) -> Callable[[Response,
     def check(resp: Response, label: str | None = None) -> None:
         name = test_name + (f".{label}" if label else "")
         path = GOLDEN_DIR / module / f"{name}.json"
-        actual = dumps(normalize_response(resp.status, resp.body, run_id))
+        actual = dumps(normalize_response(resp.status, resp.body, run_id, IDENTITY_REPLACEMENTS))
         if update:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(actual)

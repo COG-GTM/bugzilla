@@ -1,11 +1,11 @@
 {
   "body": {
     "attachments": {
-      "<id>": {
+      "<id:1>": {
         "bug_id": "<id>",
         "content_type": "text/plain",
         "creation_time": "<datetime>",
-        "creator": "admin@bugzilla.test",
+        "creator": "<admin-email>",
         "file_name": "fix.patch",
         "flags": [],
         "id": "<id>",

@@ -36,6 +36,8 @@ SECRET_KEYS = {"token", "api_key", "etag", "update_token"}
 UNORDERED_LIST_KEYS = {"cc", "groups", "keywords", "see_also", "alias", "depends_on", "blocks", "ids"}
 
 ID_LIST = re.compile(r"^\d+(,\s*\d+)*$")
+# Change fields (Bug.update "changes", Bug.history) whose added/removed values are bug ids.
+ID_CHANGE_FIELDS = {"depends_on", "blocks", "dupe_of", "dependson", "blocked", "dup_id"}
 
 ID_PLACEHOLDER = "<id>"
 TIME_PLACEHOLDER = "<datetime>"
@@ -43,17 +45,37 @@ TOKEN_PLACEHOLDER = "<token>"
 RUN_PLACEHOLDER = "<run>"
 
 
-def normalize(value: Any, run_id: str | None = None, *, key: str | None = None) -> Any:
-    """Return a copy of ``value`` with volatile data replaced by placeholders."""
+def normalize(
+    value: Any,
+    run_id: str | None = None,
+    *,
+    key: str | None = None,
+    field: str | None = None,
+    replacements: dict[str, str] | None = None,
+) -> Any:
+    """Return a copy of ``value`` with volatile data replaced by placeholders.
+
+    ``run_id`` and ``replacements`` (literal -> placeholder, e.g. the configured
+    admin login) are substituted in every string. ``field`` is the enclosing
+    change field for ``added``/``removed`` pairs.
+    """
     if isinstance(value, dict):
-        # Bug.comments / Bug.attachments key their maps by id ("bugs": {"17": ...}).
-        return {
-            (ID_PLACEHOLDER if isinstance(k, str) and k.isdigit() else k): normalize(v, run_id, key=k)
-            for k, v in sorted(value.items())
-        }
+        # Bug.comments / Bug.attachments key their maps by id ("bugs": {"17": ...}):
+        # keep every record, numbered in ascending id order.
+        numeric = sorted((k for k in value if isinstance(k, str) and k.isdigit()), key=int)
+        key_map = {k: f"<id:{i + 1}>" for i, k in enumerate(numeric)}
+        change_field = value.get("field_name") if isinstance(value.get("field_name"), str) else field
+        out = {}
+        for k, v in sorted(value.items()):
+            if key == "changes" and isinstance(v, dict):
+                sub_field = k  # Bug.update: {"changes": {"<field>": {"added", "removed"}}}
+            else:
+                sub_field = change_field
+            out[key_map.get(k, k)] = normalize(v, run_id, key=k, field=sub_field, replacements=replacements)
+        return out
 
     if isinstance(value, list):
-        items = [normalize(v, run_id, key=key) for v in value]
+        items = [normalize(v, run_id, key=key, field=field, replacements=replacements) for v in value]
         if key in UNORDERED_LIST_KEYS and all(not isinstance(i, (dict, list)) for i in items):
             items = sorted(items, key=json.dumps)
         if key == "changes":
@@ -74,11 +96,14 @@ def normalize(value: Any, run_id: str | None = None, *, key: str | None = None) 
             return TIME_PLACEHOLDER
         if key in SECRET_KEYS or (key == "token" and LOGIN_TOKEN.match(value)):
             return TOKEN_PLACEHOLDER
-        if key in ("added", "removed") and ID_LIST.match(value):
+        if key in ("added", "removed") and field in ID_CHANGE_FIELDS and ID_LIST.match(value):
             # Bug.update "changes" and Bug.history report ids as strings ("17" or "17, 18").
             return ID_PLACEHOLDER
         if run_id:
             value = value.replace(run_id, RUN_PLACEHOLDER)
+        for literal, placeholder in (replacements or {}).items():
+            if literal:
+                value = value.replace(literal, placeholder)
         if key == "message":
             # Error messages embed ids chosen at run time ("Bug #1234 does not exist",
             # "Bug 17 has already taken the alias ...").
@@ -88,9 +113,11 @@ def normalize(value: Any, run_id: str | None = None, *, key: str | None = None) 
     return value
 
 
-def normalize_response(status_code: int, body: Any, run_id: str | None = None) -> dict[str, Any]:
+def normalize_response(
+    status_code: int, body: Any, run_id: str | None = None, replacements: dict[str, str] | None = None
+) -> dict[str, Any]:
     """Shape used for golden snapshots: HTTP status plus normalised body."""
-    return {"status": status_code, "body": normalize(body, run_id)}
+    return {"status": status_code, "body": normalize(body, run_id, replacements=replacements)}
 
 
 def dumps(value: Any) -> str:

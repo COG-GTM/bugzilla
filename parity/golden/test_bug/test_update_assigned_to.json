@@ -6,7 +6,7 @@
         "changes": {
           "assigned_to": {
             "added": "parity.user@bugzilla.test",
-            "removed": "admin@bugzilla.test"
+            "removed": "<admin-email>"
           }
         },
         "id": "<id>",

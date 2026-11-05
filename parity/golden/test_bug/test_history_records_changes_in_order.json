@@ -13,7 +13,7 @@
               }
             ],
             "when": "<datetime>",
-            "who": "admin@bugzilla.test"
+            "who": "<admin-email>"
           },
           {
             "changes": [

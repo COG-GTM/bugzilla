@@ -4,8 +4,8 @@
       {
         "changes": {
           "is_obsolete": {
-            "added": "<id>",
-            "removed": "<id>"
+            "added": "1",
+            "removed": "0"
           },
           "summary": {
             "added": "renamed",

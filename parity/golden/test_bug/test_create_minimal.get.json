@@ -3,12 +3,12 @@
     "bugs": [
       {
         "alias": [],
-        "assigned_to": "admin@bugzilla.test",
+        "assigned_to": "<admin-email>",
         "assigned_to_detail": {
-          "email": "admin@bugzilla.test",
+          "email": "<admin-email>",
           "id": "<id>",
-          "name": "admin@bugzilla.test",
-          "real_name": "Test Admin"
+          "name": "<admin-email>",
+          "real_name": "<admin-name>"
         },
         "blocks": [],
         "cc": [],
@@ -16,12 +16,12 @@
         "classification": "Unclassified",
         "component": "Core",
         "creation_time": "<datetime>",
-        "creator": "admin@bugzilla.test",
+        "creator": "<admin-email>",
         "creator_detail": {
-          "email": "admin@bugzilla.test",
+          "email": "<admin-email>",
           "id": "<id>",
-          "name": "admin@bugzilla.test",
-          "real_name": "Test Admin"
+          "name": "<admin-email>",
+          "real_name": "<admin-name>"
         },
         "deadline": null,
         "depends_on": [],

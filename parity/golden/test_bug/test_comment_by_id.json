@@ -2,12 +2,12 @@
   "body": {
     "bugs": {},
     "comments": {
-      "<id>": {
+      "<id:1>": {
         "attachment_id": null,
         "bug_id": "<id>",
         "count": 1,
         "creation_time": "<datetime>",
-        "creator": "admin@bugzilla.test",
+        "creator": "<admin-email>",
         "id": "<id>",
         "is_private": false,
         "tags": [],

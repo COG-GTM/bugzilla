@@ -1,14 +1,14 @@
 {
   "body": {
     "bugs": {
-      "<id>": {
+      "<id:1>": {
         "comments": [
           {
             "attachment_id": null,
             "bug_id": "<id>",
             "count": 0,
             "creation_time": "<datetime>",
-            "creator": "admin@bugzilla.test",
+            "creator": "<admin-email>",
             "id": "<id>",
             "is_private": false,
             "tags": [],
@@ -20,7 +20,7 @@
             "bug_id": "<id>",
             "count": 1,
             "creation_time": "<datetime>",
-            "creator": "admin@bugzilla.test",
+            "creator": "<admin-email>",
             "id": "<id>",
             "is_private": true,
             "tags": [],
