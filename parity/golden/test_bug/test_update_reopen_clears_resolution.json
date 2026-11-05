@@ -1,0 +1,22 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "alias": [],
+        "changes": {
+          "resolution": {
+            "added": "",
+            "removed": "FIXED"
+          },
+          "status": {
+            "added": "CONFIRMED",
+            "removed": "RESOLVED"
+          }
+        },
+        "id": "<id>",
+        "last_change_time": "<datetime>"
+      }
+    ]
+  },
+  "status": 200
+}

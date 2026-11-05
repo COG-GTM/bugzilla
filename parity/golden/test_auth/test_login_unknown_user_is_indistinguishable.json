@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 300,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "The login or password you entered is not valid."
+  },
+  "status": 401
+}

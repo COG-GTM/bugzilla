@@ -1,0 +1,72 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "alias": [
+          "<run>-full"
+        ],
+        "assigned_to": "parity.user@bugzilla.test",
+        "assigned_to_detail": {
+          "email": "parity.user@bugzilla.test",
+          "id": "<id>",
+          "name": "parity.user@bugzilla.test",
+          "real_name": "Parity User"
+        },
+        "blocks": [
+          "<id>"
+        ],
+        "cc": [
+          "parity.user@bugzilla.test"
+        ],
+        "cc_detail": [
+          {
+            "email": "parity.user@bugzilla.test",
+            "id": "<id>",
+            "name": "parity.user@bugzilla.test",
+            "real_name": "Parity User"
+          }
+        ],
+        "classification": "Unclassified",
+        "component": "Core",
+        "creation_time": "<datetime>",
+        "creator": "admin@bugzilla.test",
+        "creator_detail": {
+          "email": "admin@bugzilla.test",
+          "id": "<id>",
+          "name": "admin@bugzilla.test",
+          "real_name": "Test Admin"
+        },
+        "deadline": null,
+        "depends_on": [
+          "<id>"
+        ],
+        "dupe_of": null,
+        "flags": [],
+        "groups": [],
+        "id": "<id>",
+        "is_cc_accessible": true,
+        "is_confirmed": true,
+        "is_creator_accessible": true,
+        "is_open": true,
+        "keywords": [],
+        "last_change_time": "<datetime>",
+        "op_sys": "All",
+        "platform": "All",
+        "priority": "High",
+        "product": "Parity Product",
+        "qa_contact": "",
+        "resolution": "",
+        "see_also": [],
+        "severity": "major",
+        "status": "CONFIRMED",
+        "summary": "Full bug <run>",
+        "target_milestone": "---",
+        "url": "https://example.test/parity",
+        "version": "1.0",
+        "whiteboard": "parity"
+      }
+    ],
+    "faults": []
+  },
+  "status": 200
+}

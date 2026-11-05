@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 123,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "You are not allowed to change the bug status from CONFIRMED to VERIFIED."
+  },
+  "status": 400
+}

@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 106,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "Sorry, either the product No Such Product does not exist or you aren't authorized to enter a bug into it."
+  },
+  "status": 401
+}

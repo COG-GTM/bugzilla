@@ -1,0 +1,15 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "id": "<id>",
+        "summary": "Search needle-<run> one"
+      },
+      {
+        "id": "<id>",
+        "summary": "Search needle-<run> two"
+      }
+    ]
+  },
+  "status": 200
+}

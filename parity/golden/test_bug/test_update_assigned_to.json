@@ -1,0 +1,18 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "alias": [],
+        "changes": {
+          "assigned_to": {
+            "added": "parity.user@bugzilla.test",
+            "removed": "admin@bugzilla.test"
+          }
+        },
+        "id": "<id>",
+        "last_change_time": "<datetime>"
+      }
+    ]
+  },
+  "status": 200
+}

@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 410,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "You must log in before using this part of Bugzilla."
+  },
+  "status": 401
+}

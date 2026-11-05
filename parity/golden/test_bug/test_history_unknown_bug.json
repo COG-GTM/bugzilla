@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 101,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "Bug #<n> does not exist."
+  },
+  "status": 404
+}

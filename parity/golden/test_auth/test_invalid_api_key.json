@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 306,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "The API key you specified is invalid. Please check that you typed it correctly."
+  },
+  "status": 400
+}

@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 51,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "There is no user named 'nobody@bugzilla.test'. Either you mis-typed the name or that user has not yet registered for a Bugzilla account."
+  },
+  "status": 404
+}

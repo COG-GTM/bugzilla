@@ -1,0 +1,26 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "alias": [],
+        "changes": {
+          "dupe_of": {
+            "added": "<id>",
+            "removed": ""
+          },
+          "resolution": {
+            "added": "DUPLICATE",
+            "removed": ""
+          },
+          "status": {
+            "added": "RESOLVED",
+            "removed": "CONFIRMED"
+          }
+        },
+        "id": "<id>",
+        "last_change_time": "<datetime>"
+      }
+    ]
+  },
+  "status": 200
+}

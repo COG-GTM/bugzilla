@@ -1,0 +1,18 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "alias": [],
+        "changes": {
+          "status": {
+            "added": "IN_PROGRESS",
+            "removed": "CONFIRMED"
+          }
+        },
+        "id": "<id>",
+        "last_change_time": "<datetime>"
+      }
+    ]
+  },
+  "status": 200
+}

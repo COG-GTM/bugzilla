@@ -1,0 +1,21 @@
+{
+  "body": {
+    "attachments": [
+      {
+        "changes": {
+          "is_obsolete": {
+            "added": "<id>",
+            "removed": "<id>"
+          },
+          "summary": {
+            "added": "renamed",
+            "removed": "parity attachment"
+          }
+        },
+        "id": "<id>",
+        "last_change_time": "<datetime>"
+      }
+    ]
+  },
+  "status": 200
+}

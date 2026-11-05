@@ -1,0 +1,40 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "alias": [],
+        "history": [
+          {
+            "changes": [
+              {
+                "added": "High",
+                "field_name": "priority",
+                "removed": "Normal"
+              }
+            ],
+            "when": "<datetime>",
+            "who": "admin@bugzilla.test"
+          },
+          {
+            "changes": [
+              {
+                "added": "FIXED",
+                "field_name": "resolution",
+                "removed": ""
+              },
+              {
+                "added": "RESOLVED",
+                "field_name": "status",
+                "removed": "CONFIRMED"
+              }
+            ],
+            "when": "<datetime>",
+            "who": "parity.user@bugzilla.test"
+          }
+        ],
+        "id": "<id>"
+      }
+    ]
+  },
+  "status": 200
+}

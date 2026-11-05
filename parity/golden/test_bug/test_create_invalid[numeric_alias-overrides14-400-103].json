@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 103,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "You tried to give this bug the alias <n>, but aliases cannot be merely numbers, since they could then be confused with bug IDs. Please choose an alias containing at least one letter."
+  },
+  "status": 400
+}

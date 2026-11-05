@@ -1,0 +1,9 @@
+{
+  "body": {
+    "parameters": {
+      "maintainer": "admin@bugzilla.test",
+      "requirelogin": "0"
+    }
+  },
+  "status": 200
+}

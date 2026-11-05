@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 51,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "There is no field named 'no_such_field'."
+  },
+  "status": 404
+}

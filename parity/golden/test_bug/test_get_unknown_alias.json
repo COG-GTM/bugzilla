@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 100,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "'no-such-alias' is not a valid bug number nor an alias to a bug."
+  },
+  "status": 400
+}

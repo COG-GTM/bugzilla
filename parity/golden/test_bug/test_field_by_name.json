@@ -1,0 +1,57 @@
+{
+  "body": {
+    "fields": [
+      {
+        "display_name": "Priority",
+        "id": "<id>",
+        "is_custom": false,
+        "is_mandatory": false,
+        "is_on_bug_entry": false,
+        "name": "priority",
+        "type": 2,
+        "value_field": null,
+        "values": [
+          {
+            "name": "Highest",
+            "sort_key": 100,
+            "sortkey": 100,
+            "visibility_values": []
+          },
+          {
+            "name": "High",
+            "sort_key": 200,
+            "sortkey": 200,
+            "visibility_values": []
+          },
+          {
+            "name": "Normal",
+            "sort_key": 300,
+            "sortkey": 300,
+            "visibility_values": []
+          },
+          {
+            "name": "Low",
+            "sort_key": 400,
+            "sortkey": 400,
+            "visibility_values": []
+          },
+          {
+            "name": "Lowest",
+            "sort_key": 500,
+            "sortkey": 500,
+            "visibility_values": []
+          },
+          {
+            "name": "---",
+            "sort_key": 600,
+            "sortkey": 600,
+            "visibility_values": []
+          }
+        ],
+        "visibility_field": null,
+        "visibility_values": []
+      }
+    ]
+  },
+  "status": 200
+}

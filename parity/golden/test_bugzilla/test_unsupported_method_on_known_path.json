@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 32614,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "A REST API resource was not found for 'DELETE /version'."
+  },
+  "status": 404
+}

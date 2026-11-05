@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 603,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "You did not specify a file to attach."
+  },
+  "status": 400
+}

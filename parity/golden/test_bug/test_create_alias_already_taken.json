@@ -1,0 +1,9 @@
+{
+  "body": {
+    "code": 103,
+    "documentation": "https://bugzilla.readthedocs.org/en/5.0/api/",
+    "error": true,
+    "message": "Bug <n> has already taken the alias <run>-taken. Please choose another alias."
+  },
+  "status": 400
+}

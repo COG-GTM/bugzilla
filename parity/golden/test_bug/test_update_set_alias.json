@@ -1,0 +1,20 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "alias": [
+          "<run>-setalias"
+        ],
+        "changes": {
+          "alias": {
+            "added": "<run>-setalias",
+            "removed": ""
+          }
+        },
+        "id": "<id>",
+        "last_change_time": "<datetime>"
+      }
+    ]
+  },
+  "status": 200
+}

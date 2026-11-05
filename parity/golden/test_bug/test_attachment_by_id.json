@@ -1,0 +1,23 @@
+{
+  "body": {
+    "attachments": {
+      "<id>": {
+        "bug_id": "<id>",
+        "content_type": "text/plain",
+        "creation_time": "<datetime>",
+        "creator": "admin@bugzilla.test",
+        "file_name": "fix.patch",
+        "flags": [],
+        "id": "<id>",
+        "is_obsolete": 0,
+        "is_patch": 1,
+        "is_private": 0,
+        "last_change_time": "<datetime>",
+        "size": 5,
+        "summary": "a patch"
+      }
+    },
+    "bugs": {}
+  },
+  "status": 200
+}

@@ -1,0 +1,61 @@
+{
+  "body": {
+    "bugs": [
+      {
+        "actual_time": 0,
+        "alias": [],
+        "assigned_to": "admin@bugzilla.test",
+        "assigned_to_detail": {
+          "email": "admin@bugzilla.test",
+          "id": "<id>",
+          "name": "admin@bugzilla.test",
+          "real_name": "Test Admin"
+        },
+        "blocks": [],
+        "cc": [],
+        "cc_detail": [],
+        "classification": "Unclassified",
+        "component": "Core",
+        "creation_time": "<datetime>",
+        "creator": "parity.user@bugzilla.test",
+        "creator_detail": {
+          "email": "parity.user@bugzilla.test",
+          "id": "<id>",
+          "name": "parity.user@bugzilla.test",
+          "real_name": "Parity User"
+        },
+        "deadline": null,
+        "depends_on": [],
+        "dupe_of": null,
+        "estimated_time": 0,
+        "flags": [],
+        "groups": [],
+        "id": "<id>",
+        "is_cc_accessible": true,
+        "is_confirmed": true,
+        "is_creator_accessible": true,
+        "is_open": true,
+        "keywords": [],
+        "last_change_time": "<datetime>",
+        "op_sys": "All",
+        "platform": "All",
+        "priority": "Normal",
+        "product": "Parity Product",
+        "qa_contact": "",
+        "remaining_time": 0,
+        "resolution": "",
+        "see_also": [],
+        "severity": "normal",
+        "status": "CONFIRMED",
+        "summary": "User bug <run>",
+        "target_milestone": "---",
+        "update_token": "<token>",
+        "url": "",
+        "version": "1.0",
+        "whiteboard": ""
+      }
+    ],
+    "faults": []
+  },
+  "status": 200
+}
