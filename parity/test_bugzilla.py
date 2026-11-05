@@ -321,9 +321,17 @@ def test_jsonp_callback(api):
 
 
 @pytest.mark.parametrize("path", ["/version", "/time"])
-def test_invalid_jsonp_callback(api, path):
-    expect_error(api.get(path, params={"callback": "bad!x"}), 400, 32611,
-                 "You cannot use 'bad!x' as your 'callback' parameter.")
+@pytest.mark.parametrize("callback", ["bad!x", "café", "a b", "alert(1)//"])
+def test_invalid_jsonp_callback(api, path, callback):
+    # Perl: /^[A-Za-z0-9_\.\[\]]+$/ - ASCII only, so a Unicode "word" character is rejected too
+    expect_error(api.get(path, params={"callback": callback}), 400, 32611,
+                 f"You cannot use '{callback}' as your 'callback' parameter.")
+
+
+def test_valid_jsonp_callback_shapes(api):
+    for callback in ("cb", "window.cb", "cbs[0]", "_x1"):
+        r = api.get("/version", params={"callback": callback})
+        assert r.status_code == 200 and r.text.startswith(f"/**/{callback}("), (callback, r.text[:40])
 
 
 def test_cors_and_etag_headers(api):

@@ -29,6 +29,9 @@ CLASS_RE = re.compile(r"^Bugzilla(::[a-zA-Z0-9_]+)*$")
 # plus the package names listed in data/extensions/additional.
 EXTENSIONS_DIR = os.environ.get("BZ_EXTENSIONS_DIR", "/var/www/html/extensions")
 ADDITIONAL_FILE = os.path.join(os.path.dirname(settings.params_path), "extensions", "additional")
+# where `additional` packages (Bugzilla::Extension::Foo -> Bugzilla/Extension/Foo.pm) are looked up
+LIB_DIRS = [d for d in os.environ.get("BZ_LIB_DIRS", "").split(":") if d] or [
+    os.path.dirname(EXTENSIONS_DIR), os.path.join(os.path.dirname(EXTENSIONS_DIR), "lib")]
 
 _NAME_RE = re.compile(r"^\s*use\s+constant\s+NAME\s*=>\s*(['\"])([^'\"]+)\1", re.MULTILINE)
 _VERSION_CONST_RE = re.compile(r"^\s*use\s+constant\s+VERSION\s*=>\s*(\S+?)\s*;", re.MULTILINE)
@@ -75,10 +78,19 @@ def _installed_extensions() -> list[tuple[str, str]]:
                 package = line.strip()
                 if not package:
                     continue
-                name = package.rsplit("::", 1)[-1]
+                name, ext_version = _read_additional_package(package)
                 if all(n != name for n, _ in found):
-                    found.append((name, "0"))
+                    found.append((name, ext_version))
     return found
+
+
+def _read_additional_package(package: str) -> tuple[str, str]:
+    """NAME/VERSION of a package listed in data/extensions/additional, read from its .pm when it can be
+    found on the lib path; otherwise the package's last component and version 0."""
+    rel = os.path.join(*package.split("::")) + ".pm"
+    sources = [p for p in (os.path.join(d, rel) for d in LIB_DIRS) if os.path.exists(p)]
+    name, ext_version = _read_name_and_version(sources) if sources else (None, "0")
+    return name or package.rsplit("::", 1)[-1], ext_version
 
 
 def _read_name_and_version(sources: list[str]) -> tuple[str | None, str]:

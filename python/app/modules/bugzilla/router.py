@@ -18,7 +18,7 @@ ERR = {"4XX": {"model": schemas.ErrorEnvelope}}
 def _check_callback(params: dict) -> None:
     # Bugzilla::WebService::Server::JSONRPC::_bz_callback_check, with Perl's exact wording
     callback = params.get("callback")
-    if callback is not None and not re.match(r"^[\w.\[\]]+$", str(callback)):
+    if callback is not None and not re.match(r"^[A-Za-z0-9_.\[\]]+$", str(callback)):
         raise BugzillaError("json_rpc_invalid_callback", f"You cannot use '{callback}' as your 'callback' parameter. "
                             "For security reasons, only letters, numbers, and the following characters are allowed "
                             "in the 'callback' parameter: []._")
