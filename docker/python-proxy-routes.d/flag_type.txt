@@ -1,0 +1,3 @@
+# FlagType module (Bugzilla::WebService::FlagType): REST path prefixes (regex, relative to /rest.cgi/) served by Python.
+flag_type
+flag_types
