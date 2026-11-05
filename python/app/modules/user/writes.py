@@ -9,6 +9,7 @@ import hashlib
 import re
 import secrets
 import string
+import unicodedata
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -85,7 +86,7 @@ def validate_password(password: str):
     complexity = param("password_complexity") or "no_constraints"
     has = {"alpha": any(c.isalpha() for c in password), "lower": any(c.islower() for c in password),
            "upper": any(c.isupper() for c in password), "digit": re.search(r"\d", password) is not None,
-           "punct": any(c in string.punctuation for c in password)}
+           "punct": any(c in string.punctuation or unicodedata.category(c).startswith("P") for c in password)}
     required = {"letters_numbers_specialchars": ("alpha", "digit", "punct"),
                 "letters_numbers": ("lower", "upper", "digit"),
                 "mixed_letters": ("lower", "upper")}.get(complexity, ())
