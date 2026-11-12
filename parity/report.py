@@ -81,6 +81,9 @@ def main():
     print(md)
     if args.markdown:
         Path(args.markdown).write_text(md + "\n")
+    not_green = [k for r in (perl, python) for k, v in r.items() if v != "pass"]
+    if not_green:
+        sys.exit(f"parity-report: {len(not_green)} test result(s) not passing")
 
 
 if __name__ == "__main__":

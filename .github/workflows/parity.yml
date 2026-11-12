@@ -96,6 +96,19 @@ jobs:
       - name: Run parity suite against Python
         run: make parity TARGET=python PYTEST_ARGS="--junitxml=parity-python.xml -rA"
 
+      - name: Apache strangler cutover (BZ_PYTHON_UPSTREAM) and parity through the proxy
+        run: |
+          BZ_PYTHON_UPSTREAM=http://bugzilla5.python:8000 docker compose up -d bugzilla5.web
+          for i in $(seq 1 120); do
+            if docker compose logs --since 5m bugzilla5.web 2>/dev/null | grep -q "Checksetup completed"; then
+              break
+            fi
+            sleep 5
+          done
+          curl -fsSi http://127.0.0.1:8080/rest.cgi/bug/1 | grep -i '^x-bugzilla-backend: python'
+          curl -fsSi http://127.0.0.1:8080/rest.cgi/version | grep -qi '^x-bugzilla-backend: python' && { echo "/version must stay on Perl"; exit 1; }
+          make parity BASE_URL=http://127.0.0.1:8080/rest.cgi PYTEST_ARGS="-q"
+
       - name: Summary
         if: always()
         run: |
