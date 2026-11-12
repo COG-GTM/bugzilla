@@ -106,6 +106,12 @@ jobs:
             sleep 5
           done
           curl -fsSi http://127.0.0.1:8080/rest.cgi/bug/1 | grep -i '^x-bugzilla-backend: python'
+          # every prefix listed in docker/python-proxy-routes.d/*.txt must reach the Python service
+          # (header "python", or "perl-fallback" when Python forwards it): no header means Apache kept it on Perl
+          for prefix in $(cat docker/python-proxy-routes.d/*.txt | grep -vE '^\s*(#|$)'); do
+            curl -si "http://127.0.0.1:8080/rest.cgi/$prefix" | grep -qi '^x-bugzilla-backend:' \
+              || { echo "proxy rule for '$prefix' not applied"; exit 1; }
+          done
           curl -fsSi http://127.0.0.1:8080/rest.cgi/version | grep -qi '^x-bugzilla-backend: python' && { echo "/version must stay on Perl"; exit 1; }
           # an unported Bug resource must reach Perl through the Python fallback (:8081), not loop or 404
           curl -si http://127.0.0.1:8080/rest.cgi/bug/comment/tags/parity | grep -i '^x-bugzilla-backend: perl-fallback'
