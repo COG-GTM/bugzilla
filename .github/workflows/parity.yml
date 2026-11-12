@@ -72,8 +72,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Start Bugzilla + Python service (docker compose)
-        run: docker compose up -d --build
+      - name: Start Bugzilla + Python service (docker compose), Perl fallback disabled
+        # BZ_PERL_UPSTREAM= (empty) switches off forward_to_perl so this job proves Python alone serves every
+        # migrated route; the fallback is re-enabled below for the cutover step.
+        run: BZ_PERL_UPSTREAM= docker compose up -d --build
 
       - name: Wait for checksetup and the Python service
         run: |
@@ -98,6 +100,7 @@ jobs:
 
       - name: Apache strangler cutover (BZ_PYTHON_UPSTREAM) and parity through the proxy
         run: |
+          docker compose up -d bugzilla5.python   # fallback (BZ_PERL_UPSTREAM default) back on for the mixed stack
           BZ_PYTHON_UPSTREAM=http://bugzilla5.python:8000 docker compose up -d bugzilla5.web
           for i in $(seq 1 120); do
             if docker compose logs --since 5m bugzilla5.web 2>/dev/null | grep -q "Checksetup completed"; then

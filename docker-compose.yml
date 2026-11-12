@@ -53,7 +53,8 @@ services:
       - BZ_DB_NAME=bugs
       - BZ_DB_PASS=bugzilla
       # unported /rest.cgi resources are forwarded back to Perl (strangler safety net)
-      - BZ_PERL_UPSTREAM=http://bugzilla5.web:8081
+      # set BZ_PERL_UPSTREAM= (empty) to disable the fallback, e.g. to prove Python alone serves the migrated routes
+      - BZ_PERL_UPSTREAM=${BZ_PERL_UPSTREAM-http://bugzilla5.web:8081}
 
   bugzilla5.db:
     build:
