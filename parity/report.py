@@ -26,10 +26,15 @@ GROUPS = OrderedDict([
 
 
 def run(base_url: str, label: str) -> dict:
-    out = Path(tempfile.gettempdir()) / f"parity-{label}.xml"
+    out = Path(tempfile.gettempdir()) / f"parity-{label}-{os.getpid()}.xml"
+    out.unlink(missing_ok=True)  # never aggregate a stale report
     env = dict(os.environ, BASE_URL=base_url)
-    subprocess.run([sys.executable, "-m", "pytest", "parity", "-q", "-p", "no:cacheprovider", f"--junitxml={out}"],
-                   env=env, cwd=Path(__file__).resolve().parent.parent, capture_output=True)
+    proc = subprocess.run([sys.executable, "-m", "pytest", "parity", "-q", "-p", "no:cacheprovider",
+                           f"--junitxml={out}"], env=env, cwd=Path(__file__).resolve().parent.parent,
+                          capture_output=True, text=True)
+    if not out.exists():  # pytest died before writing JUnit XML (collection error, crash, bad BASE_URL)
+        sys.exit(f"parity run against {label} ({base_url}) produced no JUnit XML (exit {proc.returncode}):\n"
+                 f"{proc.stdout[-2000:]}{proc.stderr[-2000:]}")
     results = {}
     for case in ET.parse(out).getroot().iter("testcase"):
         module = case.get("classname", "").split(".")[-1]
@@ -42,7 +47,10 @@ def run(base_url: str, label: str) -> dict:
 def table(perl: dict, python: dict) -> str:
     rows = ["| endpoint group | Perl | Python |", "|---|---|---|"]
     total_p = total_y = total_n = 0
-    for module, label in GROUPS.items():
+    groups = OrderedDict(GROUPS)
+    for module in sorted({m for (m, _) in set(perl) | set(python)}):
+        groups.setdefault(module, module)  # a new test_<module>.py shows up even before it is labelled here
+    for module, label in groups.items():
         names = sorted({n for (m, n) in set(perl) | set(python) if m == module})
         if not names:
             continue

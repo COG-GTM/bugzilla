@@ -1,4 +1,4 @@
-name: REST parity (Perl)
+name: REST parity (Perl and Python)
 
 on:
   push:
@@ -56,6 +56,61 @@ jobs:
         with:
           name: parity-perl-junit
           path: parity-perl.xml
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+
+  parity-python:
+    name: parity suite against the Python service
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Start Bugzilla + Python service (docker compose)
+        run: docker compose up -d --build
+
+      - name: Wait for checksetup and the Python service
+        run: |
+          for i in $(seq 1 120); do
+            if docker compose logs bugzilla5.web 2>/dev/null | grep -q "Checksetup completed"; then
+              break
+            fi
+            sleep 5
+          done
+          docker compose logs bugzilla5.web | grep -q "Checksetup completed" || { docker compose logs; exit 1; }
+          curl -fsS http://127.0.0.1:8080/rest.cgi/version
+          curl -fsS http://127.0.0.1:8000/healthz
+
+      - name: Install parity dependencies
+        run: make parity-deps
+
+      - name: Seed demo data (through Perl)
+        run: make seed
+
+      - name: Run parity suite against Python
+        run: make parity TARGET=python PYTEST_ARGS="--junitxml=parity-python.xml -rA"
+
+      - name: Summary
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET
+          s = ET.parse("parity-python.xml").getroot().find("testsuite")
+          total, fail, err, skip = (int(s.get(k)) for k in ("tests", "failures", "errors", "skipped"))
+          print(f"## Parity vs Python\n\n| tests | passed | failed | errors | skipped |\n|---|---|---|---|---|\n| {total} | {total-fail-err-skip} | {fail} | {err} | {skip} |")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: parity-python-junit
+          path: parity-python.xml
 
       - name: Container logs on failure
         if: failure()
