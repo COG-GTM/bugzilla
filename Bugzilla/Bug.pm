@@ -494,6 +494,125 @@ sub match {
   return $class->SUPER::match(@_);
 }
 
+# Loads list-valued fields for many bugs with one query per field instead
+# of one query per bug. Each list keeps the order its accessor would return.
+sub preload_lists {
+  my ($class, $bugs, $fields) = @_;
+  my $dbh  = Bugzilla->dbh;
+  my %want = map { $_ => 1 } @$fields;
+
+  my %bugs_by_id;
+  push(@{$bugs_by_id{$_->id}}, $_) foreach grep { !$_->{error} } @$bugs;
+  my @ids = keys %bugs_by_id;
+  return unless @ids;
+
+  my $rows_by_bug = sub {
+    my ($sql) = @_;
+    my %lists = map { $_ => [] } @ids;
+    push(@{$lists{$_->[0]}}, $_->[1]) foreach @{$dbh->selectall_arrayref($sql)};
+    return \%lists;
+  };
+  my $objects_by_bug = sub {
+    my ($obj_class, $lists) = @_;
+    my @obj_ids = uniq map {@$_} values %$lists;
+    my $objects = @obj_ids ? $obj_class->new_from_list(\@obj_ids) : [];
+    foreach my $id (@ids) {
+      my %mine = map { $_ => 1 } @{$lists->{$id}};
+      $lists->{$id} = [grep { $mine{$_->id} } @$objects];
+    }
+    return $lists;
+  };
+  my $assign = sub {
+    my ($key, $lists) = @_;
+    foreach my $id (@ids) {
+      $_->{$key} //= [@{$lists->{$id}}] foreach @{$bugs_by_id{$id}};
+    }
+  };
+  my $deps = sub {
+    my ($my_field, $target_field) = @_;
+    return $rows_by_bug->(
+      "SELECT $my_field, $target_field
+         FROM dependencies
+              INNER JOIN bugs ON dependencies.$target_field = bugs.bug_id
+              INNER JOIN bug_status ON bugs.bug_status = bug_status.value
+        WHERE " . $dbh->sql_in($my_field, \@ids) . "
+        ORDER BY is_open DESC, $target_field"
+    );
+  };
+
+  if ($want{alias}) {
+    $assign->(
+      'alias',
+      $rows_by_bug->(
+            'SELECT bug_id, alias FROM bugs_aliases WHERE '
+          . $dbh->sql_in('bug_id', \@ids)
+          . ' ORDER BY alias'
+      )
+    );
+  }
+  if ($want{blocked}) {
+    $assign->('blocked', $deps->('dependson', 'blocked'));
+  }
+  if ($want{dependson}) {
+    $assign->('dependson', $deps->('blocked', 'dependson'));
+  }
+  if ($want{cc}) {
+    $assign->(
+      'cc',
+      $rows_by_bug->(
+            'SELECT cc.bug_id, profiles.login_name FROM cc, profiles WHERE '
+          . $dbh->sql_in('cc.bug_id', \@ids)
+          . ' AND cc.who = profiles.userid ORDER BY profiles.login_name'
+      )
+    );
+  }
+  if ($want{cc_users}) {
+    $assign->(
+      'cc_users',
+      $objects_by_bug->(
+        'Bugzilla::User',
+        $rows_by_bug->(
+          'SELECT bug_id, who FROM cc WHERE ' . $dbh->sql_in('bug_id', \@ids)
+        )
+      )
+    );
+  }
+  if ($want{groups_in}) {
+    $assign->(
+      'groups_in',
+      $objects_by_bug->(
+        'Bugzilla::Group',
+        $rows_by_bug->(
+          'SELECT bug_id, group_id FROM bug_group_map WHERE '
+            . $dbh->sql_in('bug_id', \@ids)
+        )
+      )
+    );
+  }
+  if ($want{keyword_objects}) {
+    $assign->(
+      'keyword_objects',
+      $objects_by_bug->(
+        'Bugzilla::Keyword',
+        $rows_by_bug->(
+          'SELECT bug_id, keywordid FROM keywords WHERE ' . $dbh->sql_in('bug_id', \@ids)
+        )
+      )
+    );
+  }
+  if ($want{see_also}) {
+    $assign->(
+      'see_also',
+      $objects_by_bug->(
+        'Bugzilla::BugUrl',
+        $rows_by_bug->(
+          'SELECT bug_id, id FROM bug_see_also WHERE ' . $dbh->sql_in('bug_id', \@ids)
+        )
+      )
+    );
+  }
+}
+
 # Helps load up information for bugs for show_bug.cgi and other situations
 # that will need to access info on lots of bugs.
 sub preload {
@@ -3878,7 +3997,8 @@ sub status {
   my $self = shift;
   return undef if $self->{'error'};
 
-  $self->{'status'} ||= new Bugzilla::Status({name => $self->{'bug_status'}});
+  $self->{'status'}
+    ||= new Bugzilla::Status({name => $self->{'bug_status'}, cache => 1});
   return $self->{'status'};
 }
 

@@ -595,6 +595,7 @@ sub search {
   my %bug_objects
     = map { $_->id => $_ } @{Bugzilla::Bug->new_from_list(\@bug_ids)};
   my @bugs = map { $bug_objects{$_} } @bug_ids;
+  Bugzilla::Bug->preload_lists(\@bugs, $self->_bug_list_fields($params));
   @bugs = map { $self->_bug_to_hash($_, $params) } @bugs;
 
   return {bugs => \@bugs};
@@ -1207,6 +1208,20 @@ sub search_comment_tags {
 # to produce a stable API and to explicitly type return values.
 # The internals of Bugzilla::Bug are not stable enough to just
 # return them directly.
+
+# The Bugzilla::Bug list accessors that _bug_to_hash will call.
+sub _bug_list_fields {
+  my ($self, $params) = @_;
+  my @fields;
+  push(@fields, 'alias')           if filter_wants $params, 'alias';
+  push(@fields, 'blocked')         if filter_wants $params, 'blocks';
+  push(@fields, 'cc', 'cc_users')  if filter_wants $params, 'cc';
+  push(@fields, 'dependson')       if filter_wants $params, 'depends_on';
+  push(@fields, 'groups_in')       if filter_wants $params, 'groups';
+  push(@fields, 'keyword_objects') if filter_wants $params, 'keywords';
+  push(@fields, 'see_also')        if filter_wants $params, 'see_also';
+  return \@fields;
+}
 
 sub _bug_to_hash {
   my ($self, $bug, $params) = @_;
