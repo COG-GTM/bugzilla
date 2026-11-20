@@ -5078,6 +5078,8 @@ $user, the timestamp given as $last_visit.
 
 =item preload
 
+=item preload_lists
+
 =item groups_in
 
 =item clear_resolution
