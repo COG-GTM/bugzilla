@@ -17,7 +17,7 @@ ID = "<id>"
 
 DATETIME_KEYS = {
     "creation_time", "last_change_time", "time", "when", "web_time", "web_time_utc",
-    "db_time", "last_audit_time", "last_seen_date", "deadline",
+    "db_time", "last_audit_time", "last_seen_date",
 }
 TOKEN_KEYS = {"token"}
 ID_KEYS = {
@@ -60,6 +60,8 @@ def normalize(obj, key=None, *, id_keys=ID_KEYS, numeric_dict_keys=True):
             nk = k
             if numeric_dict_keys and isinstance(k, str) and k.isdigit():
                 nk = ID
+                if nk in out:
+                    raise NormalizeError("more than one numeric key in a dict; normalise each entry separately")
             out[nk] = normalize(v, k, id_keys=id_keys, numeric_dict_keys=numeric_dict_keys)
         return out
     if isinstance(obj, list):
