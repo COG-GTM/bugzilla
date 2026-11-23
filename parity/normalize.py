@@ -72,7 +72,7 @@ def normalize(obj, key=None, *, id_keys=ID_KEYS, numeric_dict_keys=True):
         return DATETIME
     if key in TOKEN_KEYS and obj is not None:
         if not (isinstance(obj, str) and TOKEN_RE.match(obj)):
-            raise NormalizeError(f"{key}={obj!r} is not a <userid>-<cookie> token")
+            raise NormalizeError(f"{key}=<redacted> is not a <userid>-<cookie> token")
         return TOKEN
     if key in id_keys:
         return _norm_id(obj)
