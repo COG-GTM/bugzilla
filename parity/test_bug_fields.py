@@ -42,8 +42,8 @@ def test_status_field_values_carry_transitions(api):
     assert set(names) == {None, "UNCONFIRMED", "CONFIRMED", "IN_PROGRESS", "RESOLVED", "VERIFIED"}
     assert {t["name"] for t in names[None]["can_change_to"]} >= {"CONFIRMED", "IN_PROGRESS"}
     assert names["RESOLVED"]["is_open"] is False and names["CONFIRMED"]["is_open"] is True
-    assert {"name": "RESOLVED", "comment_required": False} in names["IN_PROGRESS"]["can_change_to"] or \
-        any(t["name"] == "RESOLVED" for t in names["IN_PROGRESS"]["can_change_to"])
+    resolved = [t for t in names["IN_PROGRESS"]["can_change_to"] if t["name"] == "RESOLVED"]
+    assert len(resolved) == 1 and resolved[0]["comment_required"] is False
 
 
 def test_unknown_field(api):
