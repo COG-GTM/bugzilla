@@ -15,8 +15,11 @@ ifeq ($(TARGET),perl)
 BASE_URL ?= $(PERL_BASE_URL)
 else ifeq ($(TARGET),python)
 BASE_URL ?= $(PYTHON_BASE_URL)
+else ifeq ($(TARGET),proxied)
+# Apache front door: Perl plus whatever routes are proxied to Python.
+BASE_URL ?= $(PERL_BASE_URL)
 else
-$(error TARGET must be perl or python, got '$(TARGET)')
+$(error TARGET must be perl, python or proxied, got '$(TARGET)')
 endif
 
 .PHONY: parity parity-deps seed
