@@ -45,7 +45,11 @@ jobs:
         if: always()
         run: |
           python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import os, sys
           import xml.etree.ElementTree as ET
+          if not os.path.exists("parity-perl.xml"):
+              print("## Parity vs Perl\n\nNo JUnit report: a step before the suite failed.")
+              sys.exit(0)
           s = ET.parse("parity-perl.xml").getroot().find("testsuite")
           total, fail, err, skip = (int(s.get(k)) for k in ("tests", "failures", "errors", "skipped"))
           print(f"## Parity vs Perl\n\n| tests | passed | failed | errors | skipped |\n|---|---|---|---|---|\n| {total} | {total-fail-err-skip} | {fail} | {err} | {skip} |")
