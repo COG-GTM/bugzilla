@@ -8,8 +8,8 @@ compared verbatim (JSON shape and values).
 """
 import re
 
-DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
-TOKEN_RE = re.compile(r"^\d+-[A-Za-z0-9]+$")
+DATETIME_RE = re.compile(r"\A\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):[0-5]\d:[0-5]\dZ\Z")
+TOKEN_RE = re.compile(r"\A\d+-[A-Za-z0-9]+\Z")
 
 DATETIME = "<datetime>"
 TOKEN = "<token>"
