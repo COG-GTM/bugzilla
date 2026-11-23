@@ -90,4 +90,4 @@ def test_write_without_credentials_requires_login(api):
 
 
 def test_token_format(api, admin_token):
-    assert re.match(r"^\d+-[A-Za-z0-9]{10}$", admin_token), "token is not <userid>-<10 alnum>"
+    assert re.fullmatch(r"\d+-[A-Za-z0-9]{10}", admin_token), "token is not <userid>-<10 alnum>"
