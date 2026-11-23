@@ -3,6 +3,7 @@
 Every expectation here was taken from the running Perl app (see docs/migration/PLAN.md); the
 Python port must reproduce them byte for byte after ``normalize()``.
 """
+import json
 import re
 
 import pytest
@@ -317,7 +318,9 @@ def test_jsonp_callback(api):
     r = api.get("/version", params={"callback": "cb"})
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/javascript")
-    assert re.match(r"^\s*(/\*\*/)?cb\(", r.text) and r.text.rstrip().rstrip(";").endswith(")"), r.text[:40]
+    version = ok(api.get("/version"))
+    assert r.text.startswith("/**/cb(") and r.text.endswith(")"), r.text[:40]
+    assert json.loads(r.text[len("/**/cb("):-1]) == version
 
 
 @pytest.mark.parametrize("path", ["/version", "/time"])
@@ -341,7 +344,7 @@ def test_cors_and_etag_headers(api):
 
 
 
-@pytest.mark.parametrize("quote", ['{}', '"{}"', 'bogus, "{}"'])
+@pytest.mark.parametrize("quote", ['{}', '"{}"', 'bogus, "{}"', '"bogus", "{}"'])
 def test_if_none_match_returns_304(api, quote):
     etag = api.get("/version").headers["etag"].strip('"')
     r = api.get("/version", headers={"If-None-Match": quote.format(etag)})
