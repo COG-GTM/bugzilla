@@ -65,6 +65,7 @@ COPY ./docker /root/docker
 RUN rm -rf /var/www/html/docker* /var/www/html/Dockerfile*
 RUN rm -rf /var/www/html/data /var/www/html/localconfig /var/www/html/index.html && \
     mkdir /var/www/html/data
-RUN a2enmod expires && a2enmod headers && a2enmod rewrite && a2dismod mpm_event && a2enmod mpm_prefork
+RUN a2enmod expires && a2enmod headers && a2enmod rewrite && a2enmod proxy && a2enmod proxy_http \
+ && a2dismod mpm_event && a2enmod mpm_prefork
 EXPOSE 80/tcp
 CMD docker/startup.sh

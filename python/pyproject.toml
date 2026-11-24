@@ -1,0 +1,15 @@
+[project]
+name = "bugzilla-python"
+version = "0.1.0"
+description = "Strangler-pattern Python port of the Bugzilla REST API (FastAPI + SQLAlchemy 2.x on the existing MariaDB schema)"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 110

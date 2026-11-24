@@ -2,6 +2,34 @@
 
 [ -z "$BZ_DB_HOST" ] && echo "Missing Docker Environment, check docker-compose.yml" && exit -1
 cd /var/www/html
+
+# Strangler proxy: when BZ_PYTHON_UPSTREAM is set (e.g. http://bugzilla5.python:8000), the REST
+# routes already ported to Python are reverse-proxied there; everything else stays on Perl.
+# One file per migrated module in docker/python-proxy-routes.d/<module>.txt (one path regex per line).
+# Perl is also exposed directly (no proxy rules) on port 8081 so the Python service can forward the
+# REST resources it has not ported yet without looping back through this proxy.
+mkdir -p /etc/apache2/bugzilla-proxy
+rm -f /etc/apache2/bugzilla-proxy/*.conf
+if [ -n "$BZ_PYTHON_UPSTREAM" ]; then
+  {
+    echo "ProxyPreserveHost On"
+    echo "ProxyRequests Off"
+    cat /root/docker/python-proxy-routes.d/*.txt | grep -vE '^\s*(#|$)' | while read -r pattern; do
+      echo "ProxyPassMatch \"^/rest\\.cgi/(${pattern})(/.*)?\$\" \"${BZ_PYTHON_UPSTREAM%/}/rest.cgi/\$1\$2\""
+    done
+  } > /etc/apache2/bugzilla-proxy/python.conf
+  echo "Python strangler proxy enabled -> $BZ_PYTHON_UPSTREAM"
+  cat /etc/apache2/bugzilla-proxy/python.conf
+fi
+cat > /etc/apache2/sites-enabled/001-perl-direct.conf <<'APACHE'
+# Perl-only listener (no strangler ProxyPass rules); used as BZ_PERL_UPSTREAM by the Python service.
+Listen 8081
+<VirtualHost *:8081>
+	DocumentRoot /var/www/html
+	ErrorLog ${APACHE_LOG_DIR}/error.log
+	CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+APACHE
 apachectl start
 while :
 do

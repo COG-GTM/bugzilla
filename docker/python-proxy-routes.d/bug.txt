@@ -1,0 +1,4 @@
+# Bug module (Bugzilla::WebService::Bug): REST path prefixes (regex, relative to /rest.cgi/) served by Python.
+# One file per migrated module in this directory; docker/startup.sh turns each line into a ProxyPassMatch.
+bug
+field/bug

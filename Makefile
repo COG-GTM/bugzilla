@@ -22,7 +22,7 @@ else
 $(error TARGET must be perl, python or proxied, got '$(TARGET)')
 endif
 
-.PHONY: parity parity-deps seed
+.PHONY: parity parity-deps parity-report seed
 
 parity-deps:
 	$(PYTHON) -m pip install -q -r parity/requirements.txt
@@ -39,3 +39,7 @@ seed:
 parity:
 	$(info parity: TARGET=$(TARGET) BASE_URL=$(SHOWN_BASE_URL))
 	$(PYTHON) -m pytest parity -p no:cacheprovider -q $(PYTEST_ARGS)
+
+# endpoint | Perl | Python table (runs the suite against both targets)
+parity-report:
+	$(PYTHON) parity/report.py --perl "$$PERL_BASE_URL" --python "$$PYTHON_BASE_URL" $(if $(REPORT_OUT),--markdown $(REPORT_OUT),)
