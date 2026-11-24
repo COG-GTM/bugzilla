@@ -7,8 +7,11 @@ from parity.normalize import ID, TOKEN, normalize
 
 def test_login_returns_id_and_token(api):
     body = ok(api.get("/login", params={"login": ADMIN_LOGIN, "password": ADMIN_PASSWORD}))
-    assert normalize(body) == {"id": ID, "token": TOKEN}
-    assert body["token"].startswith(f"{body['id']}-")
+    # compare derived values only, so a failure report never contains the live token
+    shape = normalize(body)
+    assert shape == {"id": ID, "token": TOKEN}
+    has_id_prefix = body["token"].startswith(f"{body['id']}-")
+    assert has_id_prefix
 
 
 def test_login_wrong_password(api):
@@ -105,4 +108,5 @@ def test_write_without_credentials_requires_login(api):
 
 
 def test_token_format(api, admin_token):
-    assert re.fullmatch(r"\d+-[A-Za-z0-9]{10}", admin_token), "token is not <userid>-<10 alnum>"
+    well_formed = bool(re.fullmatch(r"\d+-[A-Za-z0-9]{10}", admin_token))
+    assert well_formed, "token is not <userid>-<10 alnum>"
