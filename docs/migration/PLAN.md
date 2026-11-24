@@ -151,8 +151,8 @@ Black-box HTTP contract tests, the single source of truth for "done":
   backends see identical data; write tests create their own objects with unique names and clean up.
 * **Normalisation only in `parity/normalize.py`**: timestamps (`creation_time`, `last_change_time`,
   `when`), tokens, auto-increment ids, `ETag`, ordering of unordered lists. Everything else is
-  compared verbatim. The golden value is the *live Perl response*, not a stored snapshot, so
-  drift in Perl is caught as well.
+  compared verbatim. Expectations are assertions pinned from the live Perl app, and the same
+  suite must stay green against Perl in CI, so drift in Perl is caught as well.
 * Optional "diff mode": `parity/diff.py` replays a recorded request log against both base URLs and
   prints a JSON diff — used for exploratory gaps and for the production A/B soak.
 * `make parity TARGET=perl|python|proxied`; GitHub Actions job: `docker compose up -d --build`
