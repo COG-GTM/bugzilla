@@ -151,16 +151,17 @@ class UpdateResult(BaseModel):
 
 
 class Comment(BaseModel):
-    id: int
-    bug_id: int
-    attachment_id: Optional[int]
-    count: int
-    text: str
-    creator: str
-    time: str
-    creation_time: str
-    is_private: bool
-    tags: list[str]
+    """Every key is optional: include_fields / exclude_fields choose them."""
+    id: Optional[int] = None
+    bug_id: Optional[int] = None
+    attachment_id: Optional[int] = None
+    count: Optional[int] = None
+    text: Optional[str] = None
+    creator: Optional[str] = None
+    time: Optional[str] = None
+    creation_time: Optional[str] = None
+    is_private: Optional[bool] = None
+    tags: Optional[list[str]] = None
 
 
 class CommentResult(BaseModel):

@@ -2,6 +2,7 @@
 app/modules/ that has a ``router.py`` exposing ``router`` is mounted at
 startup, so adding a module never touches this file."""
 import importlib
+import logging
 import pkgutil
 
 from fastapi import FastAPI, Request
@@ -66,6 +67,15 @@ async def unrouted(request: Request):
 
 @app.exception_handler(NotPorted)
 async def not_ported(request: Request, exc: NotPorted):
+    return await forward_to_perl(request)
+
+
+@app.exception_handler(Exception)
+async def unexpected(request: Request, exc: Exception):
+    # A defect in the port must not become an outage: services commit last, so
+    # nothing was written and Perl can still serve the request.
+    logging.getLogger("bugzilla.port").exception("unhandled error, handing %s %s to Perl",
+                                                 request.method, request.url.path)
     return await forward_to_perl(request)
 
 

@@ -44,8 +44,10 @@ class FieldFilter:
     it, and exclude_fields does not name it."""
 
     def __init__(self, params):
-        self.include = set(as_list(params.get("include_fields")))
-        self.exclude = set(as_list(params.get("exclude_fields")))
+        # Perl splits these on commas and on whitespace.
+        split = lambda value: {name for item in as_list(value) for name in str(item).split()}
+        self.include = split(params.get("include_fields"))
+        self.exclude = split(params.get("exclude_fields"))
 
     def wants(self, field):
         if field in self.exclude or ("_all" in self.exclude and field not in self.include):

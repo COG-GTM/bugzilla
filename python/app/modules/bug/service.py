@@ -34,8 +34,9 @@ MAX_SUMMARY_LENGTH = 255
 LEGAL_CONTENT_TYPES = ("application", "audio", "image", "message", "model", "multipart", "text", "video")
 CONTROL_DEFAULT, CONTROL_MANDATORY = 2, 3
 # Perl still serves a request that uses any of these (see step_aside).
-SITE_GATES = ("requirelogin", "webservice_email_filter", "strict_isolation", "ssl_redirect", "noresolveonopenblockers")
-REQUEST_GATES = ("ids", "login", "Bugzilla_login", "quicksearch")
+SITE_GATES = ("requirelogin", "webservice_email_filter", "strict_isolation", "ssl_redirect", "noresolveonopenblockers",
+              "or_groups", "shutdownhtml")
+REQUEST_GATES = ("ids", "login", "Bugzilla_login", "quicksearch", "permissive")
 CREATE_GATES = ("groups", "keywords", "see_also", "flags", "resolution", "estimated_time", "remaining_time",
                 "deadline", "work_time")
 UPDATE_GATES = ("product", "groups", "keywords", "see_also", "flags", "alias", "reset_assigned_to",
@@ -44,7 +45,7 @@ SEARCH_PARAMS = {"id", "alias", "summary", "whiteboard", "url", "status", "resol
                  "version", "op_sys", "platform", "priority", "severity", "target_milestone", "assigned_to",
                  "creator", "reporter", "qa_contact", "creation_time", "last_change_time", "limit", "offset",
                  "include_fields", "exclude_fields", "token", "api_key", "Bugzilla_token", "Bugzilla_api_key"}
-TIMETRACKING_FIELDS = ("estimated_time", "remaining_time", "work_time", "deadline")
+TIMETRACKING_FIELDS = ("estimated_time", "remaining_time", "work_time", "actual_time", "percentage_complete")
 
 
 # ---------------------------------------------------------------- errors
@@ -125,17 +126,21 @@ def _select_value(session, field, value):
     if value == "" and field != "resolution":
         raise BugzillaError(50, f"You must select/enter a {FIELD_DESC[field]}.")
     table = getattr(t, field)
-    found = session.execute(select(table.c.value).where(table.c.value == value)).scalar()
+    found = session.execute(select(table.c.value, table.c.isactive).where(table.c.value == value)).first()
     if found is None:
         raise object_not_found(f"There is no {FIELD_DESC[field]} named '{value}'.")
-    return found
+    if not found.isactive:
+        raise NotPorted("inactive value")
+    return found.value
 
 
 def _in_product(session, table, column, value, product, what):
-    found = session.execute(select(table.c[column], table.c.id).where(
+    found = session.execute(select(table.c[column], table.c.id, table.c.isactive).where(
         table.c.product_id == product.id, table.c[column] == str(value))).first()
     if found is None:
         raise object_not_found(f"There is no {what} named '{value}' in the '{product.name}' product.")
+    if not found.isactive:
+        raise NotPorted("inactive value")
     return found
 
 
@@ -312,6 +317,8 @@ def search(session, user, params, client_ip=""):
     b = t.bugs
     where = [_visible(user)]
     step_aside(session, params)
+    if not _truthy(param("search_allow_no_criteria", "1")):
+        raise NotPorted("search_allow_no_criteria")
     if set(params) - SEARCH_PARAMS:
         # Perl ignores unknown parameters but acts on many this port does not know.
         raise NotPorted("search parameter")
@@ -322,8 +329,7 @@ def search(session, user, params, client_ip=""):
 
     for name, column in (("version", b.c.version), ("op_sys", b.c.op_sys), ("platform", b.c.rep_platform),
                          ("priority", b.c.priority), ("severity", b.c.bug_severity),
-                         ("resolution", b.c.resolution), ("target_milestone", b.c.target_milestone),
-                         ("url", b.c.bug_file_loc)):
+                         ("resolution", b.c.resolution), ("target_milestone", b.c.target_milestone)):
         if (values := given(name)) is not None:
             where.append(column.in_(values))
     if (values := given("id")) is not None:
@@ -350,8 +356,12 @@ def search(session, user, params, client_ip=""):
     for name, column in (("assigned_to", b.c.assigned_to), ("creator", b.c.reporter),
                          ("reporter", b.c.reporter), ("qa_contact", b.c.qa_contact)):
         if (values := given(name)) is not None:
-            where.append(column.in_(select(p.c.userid).where(p.c.login_name.in_(values))))
-    for name, column in (("summary", b.c.short_desc), ("whiteboard", b.c.status_whiteboard)):
+            # Search type anywordssubstr: any word is a substring of the login.
+            words = [w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                     for value in values for w in str(value).split()]
+            where.append(column.in_(select(p.c.userid).where(or_(*[p.c.login_name.like(f"%{w}%") for w in words]))))
+    for name, column in (("summary", b.c.short_desc), ("whiteboard", b.c.status_whiteboard),
+                         ("url", b.c.bug_file_loc)):
         if (values := given(name)) is not None:
             where.append(_like_all_words(column, values))
     if params.get("creation_time") not in (None, ""):
@@ -485,6 +495,8 @@ def create(session, user, p):
     component = session.execute(select(comp).where(comp.c.product_id == product.id, comp.c.name == name)).first()
     if component is None:
         raise object_not_found(f"There is no component named '{name}' in the '{product.name}' product.")
+    if not component.isactive:
+        raise NotPorted("inactive component")
     summary = _clean_summary(p.get("summary"))
 
     if str(p.get("version") or "").strip() == "":
@@ -518,7 +530,7 @@ def create(session, user, p):
         cc_ids.add(_user_id(session, login, lambda n: BugzillaError(
             504, f"The name {n} is not a valid username. Either you misspelled it, "
                  "or the person has not registered for a Bugzilla account.")))
-    aliases = _check_aliases(session, p.get("alias"))
+    aliases = _check_aliases(session, user, p.get("alias"))
     depends_on = _dependency_ids(session, user, p.get("depends_on"))
     blocks = _dependency_ids(session, user, p.get("blocks"))
     _check_dependency_loop(session, depends_on, blocks)
@@ -597,7 +609,7 @@ def _initial_status(session, user, product, wanted):
     return status
 
 
-def _check_aliases(session, value):
+def _check_aliases(session, user, value):
     aliases = [str(a).strip() for a in as_list(value) if str(a).strip()]
     a = t.bugs_aliases
     for alias in aliases:
@@ -613,6 +625,9 @@ def _check_aliases(session, value):
                                      "to separate aliases from each other in lists of aliases.")
         other = session.execute(select(a.c.bug_id).where(a.c.alias == alias)).scalar()
         if other is not None:
+            other_bug = session.execute(select(t.bugs).where(t.bugs.c.bug_id == other)).one()
+            if not _can_see(session, user, other_bug):
+                raise NotPorted("alias of a hidden bug")
             raise BugzillaError(103, f"Bug {other} has already taken the alias {alias}. Please choose another alias.")
     return aliases
 
@@ -831,6 +846,7 @@ def _update_one(session, user, bug, p, now):
             session.execute(insert(dep).values(**pair(other)))
             other_activity.append((other, reverse, "", bug_id))
         for other in removed:
+            check_bug(session, user, other)
             row = pair(other)
             session.execute(delete(dep).where(dep.c.blocked == row["blocked"], dep.c.dependson == row["dependson"]))
             other_activity.append((other, reverse, bug_id, ""))
@@ -884,6 +900,8 @@ def _comment_text(session, row):
         a = t.attachments
         description = session.execute(select(a.c.description).where(a.c.attach_id == int(row.extra_data))).scalar()
         return f"Created attachment {row.extra_data}\n{description}" + (f"\n\n{row.thetext}" if row.thetext else "")
+    if row.type != CMT_NORMAL:
+        raise NotPorted("comment type")
     return row.thetext
 
 
@@ -948,7 +966,7 @@ def add_comment(session, user, raw_id, p):
     text = _clean_comment(p["comment"])
     _step_aside_for_write(session, user, bug.product_id)
     # "private" is the older name of is_private; Perl accepts both.
-    private = _private(user, p.get("is_private", p.get("private")))
+    private = _private(user, p["private"] if p.get("private") is not None else p.get("is_private"))
     now = db_now(session)
     comment_id = _add_comment(session, bug.bug_id, user.id, now, text, private=private)
     b = t.bugs
@@ -979,6 +997,8 @@ def history(session, user, raw_ids, params):
             query = query.where(not_(f.c.name.in_(TIMETRACKING_FIELDS)))
         entries = []
         for row in session.execute(query):
+            if row.name == "longdescs.isprivate" and not user.is_insider and row.added not in ("", "0", None):
+                continue
             if not entries or (entries[-1]["when"], entries[-1]["who"]) != (iso(row.bug_when), row.login_name):
                 entries.append({"when": iso(row.bug_when), "who": row.login_name, "changes": []})
             item = {"field_name": API_NAME.get(row.name, row.name), "removed": row.removed or "", "added": row.added or ""}
@@ -1004,14 +1024,23 @@ def _attachment_to_hash(session, row, login, filt):
         "creator": login,
         "creation_time": iso(row.creation_ts),
         "last_change_time": iso(row.modification_time),
-        "size": row.size or 0,
+        "size": _stored_size(row),
         "flags": _flags(session, attach_id=row.attach_id),
     }
     if filt.wants("data"):
         d = t.attach_data
         data = session.execute(select(d.c.thedata).where(d.c.id == row.attach_id)).scalar() or b""
+        if not data:
+            raise NotPorted("attachment stored on disk")
         item["data"] = base64.b64encode(data).decode()
     return filt.apply(item)
+
+
+def _stored_size(row):
+    if not row.size:
+        # No bytes in attach_data: Perl keeps the file under data/attachments.
+        raise NotPorted("attachment stored on disk")
+    return row.size
 
 
 def _attachment_query():

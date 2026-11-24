@@ -27,7 +27,9 @@ async def forward_to_perl(request: Request):
         body = await request.body()
     path = request.scope.get("bz_path", request.url.path)
     async with httpx.AsyncClient(timeout=120) as client:
-        upstream = await client.request(request.method, PERL_REST_URL + path, params=request.query_params,
+        # The raw query string is kept: repeated parameters must reach Perl unchanged.
+        query = request.scope.get("query_string", b"").decode()
+        upstream = await client.request(request.method, PERL_REST_URL + path + (f"?{query}" if query else ""),
                                         content=body, headers=headers)
     out = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP_BY_HOP}
     out["x-bugzilla-backend"] = "perl"
