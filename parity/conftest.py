@@ -60,8 +60,11 @@ def assert_error(resp, status, code, message):
 def http():
     # The Perl app closes the connection after each response, so do not reuse connections.
     limits = httpx.Limits(max_keepalive_connections=0)
-    with httpx.Client(base_url=BASE_URL, timeout=120, limits=limits,
-                      headers={"Accept": "application/json"}) as client:
+    headers = {"Accept": "application/json"}
+    if os.environ.get("PARITY_TARGET", "perl") == "perl":
+        # Apache proxies ported modules to Python; this header keeps the request on Perl.
+        headers["X-Bugzilla-Backend"] = "perl"
+    with httpx.Client(base_url=BASE_URL, timeout=120, limits=limits, headers=headers) as client:
         yield client
 
 

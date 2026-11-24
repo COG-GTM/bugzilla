@@ -47,6 +47,10 @@ s@%%BZ_URLBASE%%@'${BZ_URLBASE//@/\\@}'@;
 perl checksetup.pl /root/docker/checksetup_answers.txt
 echo "Checksetup completed."
 
+# The Python service signs bug update tokens with the same secret as Perl.
+perl -e 'do "./localconfig"; print $site_wide_secret' > data/python_site_wide_secret
+chown root:www-data data/python_site_wide_secret && chmod 640 data/python_site_wide_secret
+
 LOGIN_USER="Admin user: $BZ_ADMIN_EMAIL"
 LOGIN_PASS="Admin password: $BZ_ADMIN_PASSWORD"
 cat - <<EOF
