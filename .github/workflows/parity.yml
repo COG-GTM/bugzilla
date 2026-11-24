@@ -1,0 +1,39 @@
+name: Parity Tests
+
+on:
+  push:
+    branches: [ 5.2 ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  perl:
+    name: Parity harness against Perl
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the harness dependencies
+        run: make parity-deps
+      - name: Start the Perl app
+        run: docker compose up -d --build
+      - name: Wait for the REST API
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8080/rest.cgi/version; then exit 0; fi
+            sleep 5
+          done
+          docker compose logs
+          exit 1
+      - name: Seed demo data
+        run: make seed
+      - name: Run the parity suite against Perl
+        run: make parity TARGET=perl PYTEST_ARGS="-v"
+      - name: Container logs
+        if: failure()
+        run: docker compose logs --tail 200
