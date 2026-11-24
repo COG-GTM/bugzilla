@@ -51,7 +51,7 @@ def test_create_bug_defaults_assignee_to_component_owner(admin, make_bug):
     bug_id = make_bug("create default assignee")
     bug = admin.get(f"/bug/{bug_id}", include_fields="assigned_to,cc,status").json()["bugs"][0]
     assert bug["cc"] == [] and bug["status"] == "CONFIRMED"
-    assert bug["assigned_to"].endswith("@bugzilla.test")
+    assert bug["assigned_to"] == "bob.martins@bugzilla.test"  # owner of Catalog in the seed data
 
 
 def test_create_bug_without_severity_uses_default(admin, run_tag):
