@@ -157,9 +157,9 @@ and highest-risk slice, so it tests the approach early, at the cost of a slower 
 
 ### 5.1 Contract tests
 
-- `pytest` + `httpx`, black box, in `tests/contract/`. No imports from the Python service.
-- One base URL per run: `BASE_URL=http://127.0.0.1:8080/rest.cgi pytest tests/contract` for Perl and
-  the same command with the Python URL. CI runs both and fails if either fails.
+- `pytest` + `httpx`, black box, in `parity/`. No imports from the Python service.
+- One base URL per run: `make parity TARGET=perl` (`BASE_URL=http://127.0.0.1:8080/rest.cgi pytest parity`)
+  and `make parity TARGET=python`. CI runs both and fails if either fails.
 - Data comes from `scripts/seed_demo_data.py` (2 products, 6 components, 5 users, 20 bugs with
   comments, CC, dependencies and status changes). Tests that write create their own uniquely named
   records.
