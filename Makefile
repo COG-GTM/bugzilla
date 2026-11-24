@@ -8,7 +8,7 @@
 
 TARGET ?= perl
 PERL_BASE_URL ?= http://127.0.0.1:8080/rest.cgi
-PYTHON_BASE_URL ?= http://127.0.0.1:8000/rest
+PYTHON_BASE_URL ?= http://127.0.0.1:8000/rest.cgi
 PYTHON ?= python3
 PYTEST_ARGS ?=
 
@@ -20,11 +20,15 @@ else
 $(error TARGET must be perl or python, got "$(TARGET)")
 endif
 
-.PHONY: parity parity-deps seed
+.PHONY: parity parity-report parity-deps seed
 
 parity:
 	@echo "parity: TARGET=$(TARGET) BASE_URL=$(BASE_URL)"
-	BASE_URL=$(BASE_URL) $(PYTHON) -m pytest parity $(PYTEST_ARGS)
+	BASE_URL=$(BASE_URL) PARITY_TARGET=$(TARGET) $(PYTHON) -m pytest parity $(PYTEST_ARGS)
+
+# endpoint | Perl | Python table, from one run against each target.
+parity-report:
+	$(PYTHON) parity/report.py
 
 parity-deps:
 	$(PYTHON) -m pip install -r parity/requirements.txt

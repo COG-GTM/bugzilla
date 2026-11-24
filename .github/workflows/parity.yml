@@ -2,13 +2,13 @@ name: Parity Tests
 
 on:
   push:
-    branches: [ 5.2 ]
+    branches: [ 5.2, "migration/**" ]
   pull_request:
   workflow_dispatch:
 
 jobs:
   perl:
-    name: Parity harness against Perl
+    name: Parity harness against Perl and Python
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -34,8 +34,20 @@ jobs:
           exit 1
       - name: Seed demo data
         run: make seed
+      - name: Wait for the Python service
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8000/rest.cgi/bug/1; then exit 0; fi
+            sleep 2
+          done
+          docker compose logs bugzilla5.api
+          exit 1
       - name: Run the parity suite against Perl
         run: make parity TARGET=perl PYTEST_ARGS="-v"
+      - name: Run the parity suite against Python
+        run: make parity TARGET=python PYTEST_ARGS="-v"
+      - name: Run the parity suite through Apache (bug routes proxied to Python)
+        run: make parity TARGET=python PYTHON_BASE_URL=http://127.0.0.1:8080/rest.cgi PYTEST_ARGS="-q"
       - name: Container logs
         if: failure()
         run: docker compose logs --tail 200
