@@ -30,11 +30,14 @@ parity-deps:
 # URLs reach the recipes through the environment, never through shell text.
 export BASE_URL PERL_BASE_URL PYTHON_BASE_URL
 
+# The banner never shows user:password@ from a URL.
+SHOWN_BASE_URL = $(if $(findstring @,$(BASE_URL)),$(firstword $(subst ://, ,$(BASE_URL)))://***@$(lastword $(subst @, ,$(BASE_URL))),$(BASE_URL))
+
 seed:
 	$(PYTHON) scripts/seed_demo_data.py --base-url "$$PERL_BASE_URL"
 
 parity:
-	$(info parity: TARGET=$(TARGET) BASE_URL=$(BASE_URL))
+	$(info parity: TARGET=$(TARGET) BASE_URL=$(SHOWN_BASE_URL))
 	$(PYTHON) -m pytest parity -p no:cacheprovider -q $(PYTEST_ARGS)
 
 # endpoint | Perl | Python table (runs the suite against both targets)
