@@ -48,7 +48,8 @@ class Ctx:
 
 async def merged_params(request: Request) -> dict[str, Any]:
     params: dict[str, Any] = {}
-    body = await request.body()
+    # Perl never decodes the body of a GET (REST.pm::_retrieve_json_params)
+    body = b"" if request.method == "GET" else await request.body()
     if body:
         try:
             data = json.loads(body)
