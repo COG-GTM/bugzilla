@@ -97,8 +97,10 @@ def test_create_unknown_assignee(api, admin_token):
                  "There is no user named 'nobody@example.test'.")
 
 
-def test_create_duplicate_alias(api, admin_token):
-    expect_error(api.post("/bug", token=admin_token, json=body(alias=["seed-01"])), 400, 103)
+def test_create_duplicate_alias(api, admin_token, new_bug):
+    alias = unique("dup").replace(" ", "-")
+    new_bug(alias=[alias])
+    expect_error(api.post("/bug", token=admin_token, json=body(alias=[alias])), 400, 103)
 
 
 def test_update_status_with_comment(api, admin_token, new_bug):
