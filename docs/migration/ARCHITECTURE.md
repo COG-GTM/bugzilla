@@ -240,15 +240,17 @@ works.
 
 | REST parameter | Internal parameter | Checked against |
 |---|---|---|
-| `login` + `password` | `Bugzilla_login`, `Bugzilla_password` | `profiles.cryptpassword` (`Auth::Verify::DB`; salted SHA-256, 8-character salt) |
+| `login` + `password` | `Bugzilla_login`, `Bugzilla_password` | `profiles.cryptpassword` (`Auth::Verify::DB`; `bz_crypt` verifies whatever format is stored, including older crypt hashes, and rewrites the row as salted SHA-256 with an 8-character salt after a successful login) |
 | `api_key` | `Bugzilla_api_key` | `user_api_keys` (`Auth::Login::APIKey`) |
 | `token` | `Bugzilla_token` (format `<user_id>-<login_token>`) | `logincookies` (`Auth::Login::Cookie`): cookie, user id, and IP address unless the row's `ipaddr` is NULL |
 | Cookies `Bugzilla_login`, `Bugzilla_logincookie` | n/a | `logincookies`, same check |
 
 Static reading, not exercised here:
 
-- Cookie login is honoured only on `POST` and `PUT` (and `GET /login`). On other `GET` requests
-  `Server::REST::handle_login` disables automatic login, so cookies are ignored.
+- Cookie login is honoured only on `POST` and `PUT`. On `GET` requests
+  `Server::REST::handle_login` disables automatic login, so cookies are ignored. `GET /login` is
+  not an exception in practice: `User.login` always requires `login` and `password` parameters
+  (observed: code 50 without them).
 - If a `Bugzilla_api_token` parameter is supplied with cookies it must be a valid `api_token` for
   the same user (`tokens` table); if it is absent it is not checked.
 - Cookies take precedence over `token` when both are sent.
@@ -365,7 +367,8 @@ contract tests rather than trusting this table. Methods that exist only on JSON-
 
 ### 6.1 Response and error contract
 
-- Success: JSON object; shape is specific to each method.
+- Success: JSON object; shape is specific to each method. Exception (static reading):
+  `BugUserLastVisit.update` and `.get` return a bare JSON array, which REST passes through unwrapped.
 - Error: `{"error": true, "code": <int>, "message": "...", "documentation": "..."}`.
 - HTTP status comes from `REST_STATUS_CODE_MAP` in `Bugzilla/WebService/Constants.pm`: codes 51, 101
   and 32614 map to 404; the authorisation codes (102, 106, 109, 110, 113, 115, 120, 300-304, 410,
@@ -377,10 +380,14 @@ contract tests rather than trusting this table. Methods that exist only on JSON-
 
 Observed unless marked otherwise:
 
-- Internal Perl errors (code 100500) are returned with HTTP 200 and an error envelope.
+- Uncaught Perl failures (`die`) are returned with HTTP 200 and an error envelope with code 100500.
+  Errors raised through `Bugzilla::Error` (`ThrowUserError`, `ThrowCodeError`) go through
+  `REST_STATUS_CODE_MAP` instead (static reading for `ThrowCodeError`).
 - For non-GET requests, query parameters override JSON body values (static:
   `Server/REST.pm`).
-- `POST /bug` needs explicit `priority` and `severity` in this configuration.
+- `POST /bug` needs an explicit `priority` in this configuration: the default (`--`) is not a legal
+  value, so omitting it returns code 51. An omitted `severity` falls back to `defaultseverity`
+  (`normal` in docker).
 - `POST /bug` commits the bug before sending mail, so a mail failure returns an error for a bug that
   exists.
 - Bug changes send mail through `Bugzilla::BugMail`; in docker, on a fresh data volume, this is
