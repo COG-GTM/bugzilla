@@ -27,13 +27,16 @@ endif
 parity-deps:
 	$(PYTHON) -m pip install -q -r parity/requirements.txt
 
+# URLs reach the recipes through the environment, never through shell text.
+export BASE_URL PERL_BASE_URL PYTHON_BASE_URL
+
 seed:
-	$(PYTHON) scripts/seed_demo_data.py --base-url $(PERL_BASE_URL)
+	$(PYTHON) scripts/seed_demo_data.py --base-url "$$PERL_BASE_URL"
 
 parity:
-	@echo "parity: TARGET=$(TARGET) BASE_URL=$(BASE_URL)"
-	BASE_URL=$(BASE_URL) $(PYTHON) -m pytest parity -p no:cacheprovider -q $(PYTEST_ARGS)
+	@echo "parity: TARGET=$(TARGET) BASE_URL=$$BASE_URL"
+	$(PYTHON) -m pytest parity -p no:cacheprovider -q $(PYTEST_ARGS)
 
 # endpoint | Perl | Python table (runs the suite against both targets)
 parity-report:
-	$(PYTHON) parity/report.py --perl $(PERL_BASE_URL) --python $(PYTHON_BASE_URL) $(if $(REPORT_OUT),--markdown $(REPORT_OUT),)
+	$(PYTHON) parity/report.py --perl "$$PERL_BASE_URL" --python "$$PYTHON_BASE_URL" $(if $(REPORT_OUT),--markdown $(REPORT_OUT),)
