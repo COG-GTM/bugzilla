@@ -7,9 +7,23 @@ replaced with placeholders in exactly one place: here. Everything else is
 compared verbatim (JSON shape and values).
 """
 import re
+from datetime import datetime
 
 DATETIME_RE = re.compile(r"\A\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):[0-5]\d:[0-5]\dZ\Z")
 TOKEN_RE = re.compile(r"\A\d+-[A-Za-z0-9]+\Z")
+
+
+
+def is_datetime(value):
+    """True for a real calendar instant in Bugzilla's REST format (rejects e.g. 2023-02-29)."""
+    if not (isinstance(value, str) and DATETIME_RE.match(value)):
+        return False
+    try:
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return False
+    return True
+
 
 DATETIME = "<datetime>"
 TOKEN = "<token>"
@@ -69,7 +83,7 @@ def normalize(obj, key=None, *, id_keys=ID_KEYS, numeric_dict_keys=True):
             return _norm_id(obj)
         return [normalize(v, key, id_keys=id_keys, numeric_dict_keys=numeric_dict_keys) for v in obj]
     if key in DATETIME_KEYS and obj is not None:
-        if not (isinstance(obj, str) and DATETIME_RE.match(obj)):
+        if not is_datetime(obj):
             raise NormalizeError(f"{key}={obj!r} is not a YYYY-MM-DDTHH:MM:SSZ timestamp")
         return DATETIME
     if key in TOKEN_KEYS and obj is not None:
