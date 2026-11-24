@@ -63,7 +63,7 @@ Makefile                     # make parity TARGET=perl|python
 The core is the only place children may not edit. It must cover what every module needs:
 
 1. **Auth** — accept `token` (`<userid>-<logincookie>`), `api_key` / `X-BUGZILLA-API-KEY`,
-   `login`+`password` (body or query string, on any REST call - pinned by `parity/test_auth.py`), browser cookies
+   `login`+`password` (query string on any REST call, JSON body on non-GET calls only - pinned by `parity/test_auth.py`), browser cookies
    `Bugzilla_login`+`Bugzilla_logincookie`; `bz_crypt` SHA-256 verification; lockout rules;
    `LOGIN_EXEMPT`/optional/required semantics; group membership resolution (`user_group_map` +
    `group_group_map` closure); `can_see_bug`, `can_enter_product`, `in_group` helpers.
