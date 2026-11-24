@@ -17,6 +17,8 @@ def test_login_returns_id_and_token(api):
 def test_login_wrong_password(api):
     expect_error(api.get("/login", params={"login": ADMIN_LOGIN, "password": "wrong"}),
                  401, 300, "The login or password you entered is not valid.")
+    # a successful login clears the failure count, so reruns never reach the 5-failure lockout
+    ok(api.get("/login", params={"login": ADMIN_LOGIN, "password": ADMIN_PASSWORD}))
 
 
 def test_login_unknown_user_same_error_as_wrong_password(api):
