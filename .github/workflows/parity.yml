@@ -25,7 +25,9 @@ jobs:
       - name: Wait for the REST API
         run: |
           for i in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:8080/rest.cgi/version; then exit 0; fi
+            # /version answers before checksetup.pl has created the administrator, so wait for a login.
+            if curl -fsS -o /dev/null -G http://127.0.0.1:8080/rest.cgi/login \
+                 --data-urlencode 'login=admin@bugzilla.test' --data-urlencode 'password=password01!'; then exit 0; fi
             sleep 5
           done
           docker compose logs
