@@ -18,7 +18,7 @@ request that was sent; other parameters, non-admin users or enabled extensions c
 ```mermaid
 flowchart LR
   client[Browser / API client] -->|HTTP :8080| apache[Apache 2.4<br/>container bugzilla5.web]
-  apache -->|CGI or mod_perl| cgi[*.cgi entry points]
+  apache -->|mod_perl| cgi[*.cgi entry points]
   cgi --> core[Bugzilla.pm + Bugzilla/*.pm]
   core -->|DBI / DBD::mysql| db[(MariaDB<br/>container bugzilla5.db)]
   core --> tt[Template Toolkit<br/>template/en/default]
@@ -27,8 +27,9 @@ flowchart LR
   core -.optional.-> jobq[jobqueue.pl / TheSchwartz]
 ```
 
-- The docker image runs the scripts as plain CGI. `mod_perl.pl` is the alternative deployment: it
-  preloads the code and routes every `*.cgi` through `Bugzilla::ModPerl::ResponseHandler`.
+- The docker image runs under mod_perl: `docker/000-default.conf` loads `mod_perl.pl`, which
+  preloads the code and routes every `*.cgi` through `Bugzilla::ModPerl::ResponseHandler`. The same
+  scripts also run as plain CGI.
 - All state is in MariaDB plus the `data/` directory. Perl processes hold only per-request state
   (`Bugzilla->request_cache`).
 - Extensions shipped in `extensions/`: BmpConvert, Example, MoreBugUrl, OldBugMove, Voting. They hook
@@ -172,6 +173,8 @@ Common to every authenticated request (not repeated below):
 
 - R `profiles`, `groups`, `user_group_map`, `group_group_map` (user and group membership).
 - W `logincookies` (`lastused` is updated when a token is validated).
+- The trace also showed a statement against `tokens` on `GET /login` and `POST /user`; the code path
+  was not identified (token validation itself reads only `logincookies`).
 - Bug-level access checks add R `bugs`, `bug_group_map`, `cc`.
 - Every write endpoint also issued a statement against `mail_staging`.
 
@@ -239,11 +242,18 @@ works.
 |---|---|---|
 | `login` + `password` | `Bugzilla_login`, `Bugzilla_password` | `profiles.cryptpassword` (`Auth::Verify::DB`; salted SHA-256, 8-character salt) |
 | `api_key` | `Bugzilla_api_key` | `user_api_keys` (`Auth::Login::APIKey`) |
-| `token` | `Bugzilla_token` (format `<user_id>-<login_token>`) | `tokens`, then `logincookies` (`Auth::Login::Cookie`) |
-| Cookies `Bugzilla_login`, `Bugzilla_logincookie` | n/a | `logincookies` |
+| `token` | `Bugzilla_token` (format `<user_id>-<login_token>`) | `logincookies` (`Auth::Login::Cookie`): cookie, user id, and IP address unless the row's `ipaddr` is NULL |
+| Cookies `Bugzilla_login`, `Bugzilla_logincookie` | n/a | `logincookies`, same check |
 
-Static reading, not exercised here: on REST, cookie authentication also requires a valid
-`Bugzilla_api_token` parameter (CSRF protection for the browser UI's own API calls).
+Static reading, not exercised here:
+
+- Cookie login is honoured only on `POST` and `PUT` (and `GET /login`). On other `GET` requests
+  `Server::REST::handle_login` disables automatic login, so cookies are ignored.
+- If a `Bugzilla_api_token` parameter is supplied with cookies it must be a valid `api_token` for
+  the same user (`tokens` table); if it is absent it is not checked.
+- Cookies take precedence over `token` when both are sent.
+- The login token is the `logincookies.cookie` value; `Auth::Persist::Cookie` inserts the row with
+  the client IP unless `Bugzilla_restrictlogin` is off.
 
 ### 5.2 Sequence
 
@@ -259,13 +269,12 @@ sequenceDiagram
   R->>A: Bugzilla->login()
   A->>D: Auth::Login::Stack: read profiles
   A->>D: Auth::Verify::DB: compare cryptpassword, record login_failure on error
-  A->>D: Auth::Persist::Cookie: INSERT logincookies
-  R->>D: Token: issue api token
+  A->>D: Auth::Persist::Cookie: INSERT logincookies (cookie, userid, ipaddr)
   R-->>C: {"id": 1, "token": "1-AbCdEf"}
 
   C->>R: GET /rest.cgi/bug/1?token=1-AbCdEf
   R->>A: Bugzilla->login()
-  A->>D: Auth::Login::Cookie: read tokens, logincookies
+  A->>D: Auth::Login::Cookie: SELECT logincookies (cookie, userid, ipaddr)
   A->>D: UPDATE logincookies.lastused
   A-->>R: Bugzilla::User
   R->>R: WebService::Bug->get, visibility checks via user_group_map / bug_group_map
@@ -374,6 +383,9 @@ Observed unless marked otherwise:
 - `POST /bug` needs explicit `priority` and `severity` in this configuration.
 - `POST /bug` commits the bug before sending mail, so a mail failure returns an error for a bug that
   exists.
-- Bug changes send mail through `Bugzilla::BugMail`; in docker this is written to
-  `data/mailer.testfile`.
+- Bug changes send mail through `Bugzilla::BugMail`; in docker, on a fresh data volume, this is
+  written to `data/mailer.testfile` (an existing `data/params.json` keeps its own
+  `mail_delivery_method`).
+- Static: responses carry an `ETag`, and a matching `If-None-Match` returns `304 Not Modified` with
+  no body (`Server::JSONRPC::response`, inherited by REST).
 - Token validation writes to `logincookies`, so even "read" requests write to the database.

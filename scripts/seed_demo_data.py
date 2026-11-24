@@ -161,7 +161,9 @@ class Client:
 def ensure_users(api):
     created = 0
     for email, name in USERS:
-        if api.call("GET", "/user", {"match": email})["users"]:
+        # "match" is a substring search, so compare the login exactly.
+        matches = api.call("GET", "/user", {"match": email})["users"]
+        if any(u["name"].lower() == email for u in matches):
             continue
         api.call("POST", "/user", body={"email": email, "full_name": name, "password": USER_PASSWORD})
         created += 1
@@ -178,9 +180,9 @@ def ensure_products(api):
                 "is_open": True, "has_unconfirmed": True,
             })
             created[0] += 1
-        existing = {c["name"] for p in found for c in p["components"]}
+        existing = {c["name"].lower() for p in found for c in p["components"]}
         for comp, desc, owner in spec["components"]:
-            if comp in existing:
+            if comp.lower() in existing:
                 continue
             api.call("POST", "/component", body={
                 "product": name, "name": comp, "description": desc, "default_assignee": owner,

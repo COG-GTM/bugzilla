@@ -36,7 +36,7 @@ flowchart LR
 | Configuration | DB credentials from environment. Bugzilla parameters read from `data/params.json` (mounted read-only). |
 | Routing | Apache `ProxyPass` rules, one per migrated path prefix, in front of the CGI handler. Rollback is removing the rule. |
 | Errors | One exception type carrying the Bugzilla error code; a single handler renders the Perl error envelope and maps the code to the HTTP status with the same table as `REST_STATUS_CODE_MAP`. |
-| Transactions | One DB transaction per request, matching `bz_start_transaction` / `bz_commit_transaction`. |
+| Transactions | Commit at the same points as Perl (`bz_start_transaction` / `bz_commit_transaction`), not one transaction per request. Example: bug create and update commit before mail is sent, so a mail failure returns an error for a change that is saved. |
 
 Proposed layout:
 
@@ -60,10 +60,10 @@ tests/contract/        black-box tests, see section 5
 
 | Piece | Mirrors | Notes |
 |---|---|---|
-| Auth dependency | `Bugzilla::Auth`, `WebService::Util::fix_credentials` | `login`+`password`, `token`, `api_key`. Password check must match the `profiles.cryptpassword` format. Token validation updates `logincookies.lastused` as Perl does. |
+| Auth dependency | `Bugzilla::Auth`, `WebService::Util::fix_credentials`, `Server::REST::handle_login` | `login`+`password`, `token`, `api_key`, and the browser cookies (`Bugzilla_login`, `Bugzilla_logincookie`, optional `Bugzilla_api_token`) on `POST`/`PUT`. Password check must match the `profiles.cryptpassword` format. Token validation applies the same IP check and updates `logincookies.lastused` as Perl does. Apache must pass the client IP to Python. |
 | Group resolution | `Bugzilla::User::groups` | `user_group_map` expanded through `group_group_map`. Needed by every visibility check. |
 | Parameter merging | `Server::REST` | Path, body and query merged; query overrides body on non-GET. |
-| Field filtering | `WebService::Util::filter` | `include_fields` / `exclude_fields` on every response. |
+| Field filtering | `WebService::Util::filter` | `include_fields` / `exclude_fields`, applied only where the Perl method applies it (for example `version` always returns its key). |
 | Error envelope | `Bugzilla::Error`, `WebService::Constants` | Copy `WS_ERROR_CODE` and the status map as data. |
 | Audit log | `Bugzilla::Object::audit_log` | Admin writes insert into `audit_log`. |
 
@@ -166,7 +166,7 @@ Values that legitimately differ between two runs are normalised before compariso
 
 | Value | Rule |
 |---|---|
-| Timestamps (`creation_time`, `last_change_time`, comment `time`) | Assert format, compare only as "not before the request started". |
+| Timestamps (`creation_time`, `last_change_time`, comment `time`) | Assert format. For records the test just wrote: not before the write started. For seeded records in the differential runner: compared exactly, since both implementations read the same row. |
 | Generated ids on create | Assert type, then fetch the record and compare it. |
 | Login tokens | Assert format `<user_id>-<token>`. |
 | Error `message` text | Compared exactly; a difference is a failure unless listed as an accepted deviation. |
@@ -204,6 +204,8 @@ Read in the source, to be confirmed by tests before any slice relies on them:
 - Path captures with commas (`/bug/1,2`) and repeated query parameters.
 - `include_fields`, `exclude_fields` and the `_default`, `_all`, `_extra` pseudo-fields.
 - Truthiness of string values such as `"false"` and `"0"` for boolean parameters.
+- `ETag` response header and `304 Not Modified` on a matching `If-None-Match`.
+- Cookie authentication on `POST`/`PUT`, and its absence on `GET`.
 
 ## 6. Open decisions
 
