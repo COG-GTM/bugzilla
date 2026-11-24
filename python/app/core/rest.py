@@ -48,7 +48,8 @@ class Ctx:
 
 async def merged_params(request: Request) -> dict[str, Any]:
     params: dict[str, Any] = {}
-    body = await request.body()
+    # Perl never decodes the body of a GET (REST.pm::_retrieve_json_params)
+    body = b"" if request.method == "GET" else await request.body()
     if body:
         try:
             data = json.loads(body)
@@ -79,11 +80,24 @@ async def context(request: Request, db: Session = Depends(get_db)) -> Ctx:
     return Ctx(request=request, db=db, params=params, user=user, filter=Filter.from_params(params))
 
 
+def _etag_matches(if_none_match: str | None, etag: str) -> bool:
+    if not if_none_match:
+        return False
+    for candidate in re.split(r"[\s,]+", if_none_match):
+        candidate = re.sub(r'^"|"$', "", candidate)
+        if candidate in (etag, "*"):
+            return True
+    return False
+
+
 def json_response(request: Request, payload: Any, status: int = 200) -> Response:
     body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
     headers = {"Access-Control-Allow-Origin": "*", "X-Bugzilla-Backend": "python",
                "Access-Control-Allow-Headers": "origin, content-type, accept, x-requested-with",
                "ETag": '"' + hashlib.md5(body.encode()).hexdigest() + '"'}
+    # Bugzilla::CGI::check_etag: a matching If-None-Match on a successful call is an empty 304.
+    if status < 300 and _etag_matches(request.headers.get("if-none-match"), headers["ETag"].strip('"')):
+        return Response(status_code=304, headers=headers)
     callback = getattr(request.state, "callback", None)
     if callback and re.match(r"^[\w.\[\]]+$", str(callback)):
         return Response(f"/**/{callback}({body})", status_code=status, media_type="text/javascript",
