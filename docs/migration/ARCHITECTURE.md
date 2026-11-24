@@ -242,7 +242,7 @@ works.
 
 | REST parameter | Internal parameter | Checked against |
 |---|---|---|
-| `login` + `password` | `Bugzilla_login`, `Bugzilla_password` | `profiles.cryptpassword` (`Auth::Verify::DB`; `bz_crypt` verifies whatever format is stored, including older crypt hashes, and rewrites the row as salted SHA-256 with an 8-character salt after a successful login) |
+| `login` + `password` | `Bugzilla_login`, `Bugzilla_password` | `profiles.cryptpassword` (`Auth::Verify::DB`; `bz_crypt` verifies whatever format is stored, including older crypt hashes, and, only when the stored hash does not already use the current algorithm and salt length, rewrites the row as salted SHA-256 with an 8-character salt after a successful login) |
 | `api_key` | `Bugzilla_api_key` | `user_api_keys` (`Auth::Login::APIKey`) |
 | `token` | `Bugzilla_token` (format `<user_id>-<login_token>`) | `logincookies` (`Auth::Login::Cookie`): cookie, user id, and IP address unless the row's `ipaddr` is NULL |
 | Cookies `Bugzilla_login`, `Bugzilla_logincookie` | n/a | `logincookies`, same check |

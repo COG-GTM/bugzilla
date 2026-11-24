@@ -147,6 +147,9 @@ and highest-risk slice, so it tests the approach early, at the cost of a slower 
 - A path-prefix rule sends every method to Python, including ones the module did not list. Perl
   answers `OPTIONS` on a known path with an `Allow` header, so a module either reproduces that or
   its rule is restricted to the methods it ported.
+- A prefix rule also captures paths under it that Perl does not know (`/version/extra`). Rules match
+  the ported paths exactly (`ProxyPassMatch` with an anchored pattern), or Python reproduces Perl's
+  error 32614 for them.
 - The repository `.htaccess` also rewrites `/rest/...` to `rest.cgi/...`; the proxy rules must cover
   both spellings.
 - Python serves under the same `/rest.cgi/` prefix so the tests need only a base URL.
@@ -175,7 +178,7 @@ Values that legitimately differ between two runs are normalised before compariso
 | Generated ids on create | Assert type, then fetch the record and compare it. |
 | Login tokens | Assert format `<user_id>-<token>`. |
 | Bug `update_token` | Replaced by a placeholder: it embeds its issue time. The placeholder also hides the signature, so compatibility is checked separately: a token issued by Python must be accepted by `process_bug.cgi`. |
-| `GET /time` values | Assert format only. |
+| `GET /time` values | Timestamps by format; `tz_name`, `tz_offset` and `tz_short_name` exactly. |
 | Error `message` text | Compared exactly; a difference is a failure unless listed as an accepted deviation. |
 | Key order | Ignored (JSON objects). Array order is compared. |
 
@@ -221,7 +224,8 @@ Read in the source, to be confirmed by tests before any slice relies on them:
 1. **Bug mail from Python.** Options: (a) Python inserts a job that a Perl worker sends
    (`jobqueue.pl`), keeping one mail implementation; (b) Python calls a small internal Perl endpoint
    after commit; (c) reimplement `BugMail` in Python. Recommendation: (a). Note for (a): a queued `bug_mail` job carries a prepared recipient payload, and
-   the bug's `lastdiffed` watermark must still be advanced or `sanitycheck.cgi` will resend; the
+   the bug's `lastdiffed` watermark must be advanced only for the bug whose changes were mailed (Perl leaves
+   it alone on the blocked bugs it notifies when a blocker closes or reopens) or `sanitycheck.cgi` will resend; the
    design must cover both. Needed before unit 9b;
    admin writes in units 4 to 8 should be checked for mail first (they touched `mail_staging` in the
    trace).
