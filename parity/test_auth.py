@@ -7,8 +7,11 @@ from parity.normalize import ID, TOKEN, normalize
 
 def test_login_returns_id_and_token(api):
     body = ok(api.get("/login", params={"login": ADMIN_LOGIN, "password": ADMIN_PASSWORD}))
-    assert normalize(body) == {"id": ID, "token": TOKEN}
-    assert body["token"].startswith(f"{body['id']}-")
+    # compare derived values only, so a failure report never contains the live token
+    shape = normalize(body)
+    assert shape == {"id": ID, "token": TOKEN}
+    has_id_prefix = body["token"].startswith(f"{body['id']}-")
+    assert has_id_prefix
 
 
 def test_login_wrong_password(api):
@@ -84,10 +87,26 @@ def test_query_string_credentials_authenticate_any_call(api):
                           json={"product": "x"}), 400, 50)
 
 
+def test_json_body_credentials_authenticate_non_get_call(api):
+    expect_error(api.post("/bug", json={"product": "x", "login": ADMIN_LOGIN, "password": ADMIN_PASSWORD}),
+                 400, 50)
+
+
+def test_json_body_credentials_are_ignored_on_get(api):
+    # GET bodies are never decoded, so the caller stays anonymous and sees the anonymous parameter set.
+    creds = {"login": ADMIN_LOGIN, "password": ADMIN_PASSWORD}
+    anonymous = ok(api.get("/parameters"))["parameters"]
+    with_body = ok(api.request("GET", "/parameters", json=creds))["parameters"]
+    with_query = ok(api.get("/parameters", params=creds))["parameters"]
+    assert with_body == anonymous
+    assert len(with_query) > len(anonymous)
+
+
 def test_write_without_credentials_requires_login(api):
     expect_error(api.post("/bug", json={"product": "x"}), 401, 410,
                  "You must log in before using this part of Bugzilla.")
 
 
 def test_token_format(api, admin_token):
-    assert re.match(r"^\d+-[A-Za-z0-9]{10}$", admin_token), admin_token
+    well_formed = bool(re.fullmatch(r"\d+-[A-Za-z0-9]{10}", admin_token))
+    assert well_formed, "token is not <userid>-<10 alnum>"

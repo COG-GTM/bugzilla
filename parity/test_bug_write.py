@@ -147,11 +147,12 @@ def test_update_cc_add_remove(api, admin_token, new_bug):
     assert r["bugs"][0]["changes"] == {"cc": {"removed": "bruno.costa@bugzilla.test", "added": ""}}
 
 
-def test_update_dependencies(api, admin_token, new_bug, seed):
+def test_update_dependencies(api, admin_token, new_bug):
     bug_id = new_bug()
-    r = ok(api.put(f"/bug/{bug_id}", token=admin_token, json={"depends_on": {"add": [seed["seed-05"]]}}))
-    assert r["bugs"][0]["changes"] == {"depends_on": {"removed": "", "added": str(seed["seed-05"])}}
-    other = ok(api.get("/bug/seed-05", params={"include_fields": "blocks"}))["bugs"][0]
+    dep_id = new_bug()
+    r = ok(api.put(f"/bug/{bug_id}", token=admin_token, json={"depends_on": {"add": [dep_id]}}))
+    assert r["bugs"][0]["changes"] == {"depends_on": {"removed": "", "added": str(dep_id)}}
+    other = ok(api.get(f"/bug/{dep_id}", params={"include_fields": "blocks"}))["bugs"][0]
     assert bug_id in other["blocks"]
 
 

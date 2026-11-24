@@ -1,5 +1,8 @@
 """Bugzilla::WebService::Bugzilla - version, extensions, timezone, time, last_audit_time, parameters."""
+import json
 import re
+
+import pytest
 
 from parity.conftest import expect_error, ok
 from parity.normalize import DATETIME, normalize
@@ -79,10 +82,26 @@ def test_jsonp_callback(api):
     r = api.get("/version", params={"callback": "cb"})
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/javascript")
-    assert re.match(r"^\s*(/\*\*/)?cb\(", r.text) and r.text.rstrip().rstrip(";").endswith(")"), r.text[:40]
+    version = ok(api.get("/version"))
+    assert r.text.startswith("/**/cb(") and r.text.endswith(")"), r.text[:40]
+    assert json.loads(r.text[len("/**/cb("):-1]) == version
 
 
 def test_cors_and_etag_headers(api):
     r = api.get("/version")
     assert r.headers.get("access-control-allow-origin") == "*"
     assert r.headers.get("etag")
+
+
+
+@pytest.mark.parametrize("quote", ['{}', '"{}"', 'bogus, "{}"', '"bogus", "{}"'])
+def test_if_none_match_returns_304(api, quote):
+    etag = api.get("/version").headers["etag"].strip('"')
+    r = api.get("/version", headers={"If-None-Match": quote.format(etag)})
+    assert r.status_code == 304 and r.content == b""
+    assert r.headers["etag"].strip('"') == etag
+
+
+def test_if_none_match_mismatch_returns_body(api):
+    r = api.get("/version", headers={"If-None-Match": '"bogus"'})
+    assert r.status_code == 200 and "version" in r.json()

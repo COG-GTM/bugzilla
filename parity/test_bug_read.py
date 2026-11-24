@@ -41,9 +41,8 @@ def test_get_by_alias_default_fields(api, seed):
     assert {"id": ID, "name": "bruno.costa@bugzilla.test", "email": "bruno.costa@bugzilla.test",
             "real_name": "Bruno Costa"} in normalize(bug["cc_detail"])
     assert [d["name"] for d in bug["cc_detail"]] == bug["cc"]
-    assert normalize({"t": bug["creation_time"], "u": bug["last_change_time"]},
-                     id_keys=set()) == {"t": bug["creation_time"], "u": bug["last_change_time"]}
-    assert normalize({"creation_time": bug["creation_time"]}) == {"creation_time": DATETIME}
+    assert normalize({"creation_time": bug["creation_time"], "last_change_time": bug["last_change_time"]}) == {
+        "creation_time": DATETIME, "last_change_time": DATETIME}
 
 
 def test_get_by_id_matches_get_by_alias(api, seed):
