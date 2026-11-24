@@ -42,6 +42,8 @@ def test_comments_include_fields(anon, bug):
 
 
 def test_comments_new_since_in_the_future(anon, bug):
+    past = anon.get(f"/bug/{bug}/comment", new_since="2000-01-01T00:00:00Z")
+    assert len(past.json()["bugs"][str(bug)]["comments"]) == 1
     resp = anon.get(f"/bug/{bug}/comment", new_since="2099-01-01T00:00:00Z")
     assert normalize(resp.json(), {bug: "A"}) == {"comments": {}, "bugs": {"<BUG:A>": {"comments": []}}}
 
@@ -127,7 +129,9 @@ def test_history_records_dependencies_on_both_bugs(admin, anon, bug, make_bug):
 
 
 def test_history_new_since_in_the_future(admin, anon, bug):
-    admin.put(f"/bug/{bug}", {"priority": "High"})
+    assert admin.put(f"/bug/{bug}", {"priority": "High"}).status_code == 200
+    past = anon.get(f"/bug/{bug}/history", new_since="2000-01-01T00:00:00Z")
+    assert len(past.json()["bugs"][0]["history"]) == 1
     resp = anon.get(f"/bug/{bug}/history", new_since="2099-01-01T00:00:00Z")
     assert normalize(resp.json(), {bug: "A"}) == {"bugs": [{"alias": [], "history": [], "id": "<BUG:A>"}]}
 
