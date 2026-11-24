@@ -84,6 +84,21 @@ def test_query_string_credentials_authenticate_any_call(api):
                           json={"product": "x"}), 400, 50)
 
 
+def test_json_body_credentials_authenticate_non_get_call(api):
+    expect_error(api.post("/bug", json={"product": "x", "login": ADMIN_LOGIN, "password": ADMIN_PASSWORD}),
+                 400, 50)
+
+
+def test_json_body_credentials_are_ignored_on_get(api):
+    # GET bodies are never decoded, so the caller stays anonymous and sees the anonymous parameter set.
+    creds = {"login": ADMIN_LOGIN, "password": ADMIN_PASSWORD}
+    anonymous = ok(api.get("/parameters"))["parameters"]
+    with_body = ok(api.request("GET", "/parameters", json=creds))["parameters"]
+    with_query = ok(api.get("/parameters", params=creds))["parameters"]
+    assert with_body == anonymous
+    assert len(with_query) > len(anonymous)
+
+
 def test_write_without_credentials_requires_login(api):
     expect_error(api.post("/bug", json={"product": "x"}), 401, 410,
                  "You must log in before using this part of Bugzilla.")
