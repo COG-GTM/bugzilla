@@ -34,7 +34,7 @@ seed:
 	$(PYTHON) scripts/seed_demo_data.py --base-url "$$PERL_BASE_URL"
 
 parity:
-	@echo "parity: TARGET=$(TARGET) BASE_URL=$$BASE_URL"
+	$(info parity: TARGET=$(TARGET) BASE_URL=$(BASE_URL))
 	$(PYTHON) -m pytest parity -p no:cacheprovider -q $(PYTEST_ARGS)
 
 # endpoint | Perl | Python table (runs the suite against both targets)
