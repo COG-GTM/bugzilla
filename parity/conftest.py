@@ -54,6 +54,7 @@ class Api:
         return self.request("PUT", path, **kw)
 
     def login(self, login, password):
+        __tracebackhide__ = True  # keep the password argument out of pytest failure reports
         r = self.get("/login", params={"login": login, "password": password})
         assert r.status_code == 200, r.text
         return r.json()["token"]
