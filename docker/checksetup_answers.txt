@@ -20,6 +20,7 @@ $answer{'index_html'}           = 0;
 $answer{'interdiffbin'}         = '/usr/bin/interdiff';
 $answer{'user_info_class'}      = 'CGI';
 $answer{'user_verify_class'}    = 'DB';
+$answer{'mail_delivery_method'} = 'Test';
 $answer{'use_mailer_queue'}     = 0;
 $answer{'useclassification'}    = 1;
 $answer{'usebugaliases'}        = 1;
