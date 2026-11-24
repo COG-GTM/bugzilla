@@ -46,6 +46,11 @@ jobs:
         run: make parity TARGET=perl PYTEST_ARGS="-v"
       - name: Run the parity suite against Python
         run: make parity TARGET=python PYTEST_ARGS="-v"
+      - name: Check that Apache routes the Bug module to Python and the rest to Perl
+        run: |
+          curl -fsS -D - -o /dev/null http://127.0.0.1:8080/rest.cgi/bug/1 | grep -i '^x-bugzilla-backend: python'
+          ! curl -fsS -D - -o /dev/null http://127.0.0.1:8080/rest.cgi/version | grep -i '^x-bugzilla-backend'
+          ! curl -fsS -D - -o /dev/null -H 'X-Bugzilla-Backend: perl' http://127.0.0.1:8080/rest.cgi/bug/1 | grep -i '^x-bugzilla-backend: python'
       - name: Run the parity suite through Apache (bug routes proxied to Python)
         run: make parity TARGET=python PYTHON_BASE_URL=http://127.0.0.1:8080/rest.cgi PYTEST_ARGS="-q"
       - name: Container logs

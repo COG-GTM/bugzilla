@@ -48,7 +48,7 @@ class FieldFilter:
         self.exclude = set(as_list(params.get("exclude_fields")))
 
     def wants(self, field):
-        if field in self.exclude:
+        if field in self.exclude or ("_all" in self.exclude and field not in self.include):
             return False
         return not self.include or field in self.include or bool(self.include & {"_all", "_default"})
 

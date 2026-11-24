@@ -7,7 +7,7 @@ import re
 
 from sqlalchemy import and_, delete, exists, func, insert, not_, or_, select, update
 
-from app.core.auth import issue_hash_token, require_login
+from app.core.auth import issue_hash_token, load_user, require_login
 from app.core.config import param
 from app.core.db import db_now, t
 from app.core.errors import BugzillaError, param_required
@@ -33,8 +33,18 @@ MAX_COMMENT_LENGTH = 65535
 MAX_SUMMARY_LENGTH = 255
 LEGAL_CONTENT_TYPES = ("application", "audio", "image", "message", "model", "multipart", "text", "video")
 CONTROL_DEFAULT, CONTROL_MANDATORY = 2, 3
-NOT_PORTED = ("product", "groups", "keywords", "see_also", "flags", "alias", "reset_assigned_to",
-              "reset_qa_contact", "comment_is_private", "work_time")
+# Perl still serves a request that uses any of these (see step_aside).
+SITE_GATES = ("requirelogin", "webservice_email_filter", "strict_isolation", "ssl_redirect", "noresolveonopenblockers")
+REQUEST_GATES = ("ids", "login", "Bugzilla_login", "quicksearch")
+CREATE_GATES = ("groups", "keywords", "see_also", "flags", "resolution", "estimated_time", "remaining_time",
+                "deadline", "work_time")
+UPDATE_GATES = ("product", "groups", "keywords", "see_also", "flags", "alias", "reset_assigned_to",
+                "reset_qa_contact", "comment_is_private", "work_time")
+SEARCH_PARAMS = {"id", "alias", "summary", "whiteboard", "url", "status", "resolution", "product", "component",
+                 "version", "op_sys", "platform", "priority", "severity", "target_milestone", "assigned_to",
+                 "creator", "reporter", "qa_contact", "creation_time", "last_change_time", "limit", "offset",
+                 "include_fields", "exclude_fields", "token", "api_key", "Bugzilla_token", "Bugzilla_api_key"}
+TIMETRACKING_FIELDS = ("estimated_time", "remaining_time", "work_time", "deadline")
 
 
 # ---------------------------------------------------------------- errors
@@ -46,6 +56,35 @@ def object_not_found(text):
 def no_such_user(name):
     return object_not_found(f"There is no user named '{name}'. Either you mis-typed the name or that user "
                             "has not yet registered for a Bugzilla account.")
+
+
+# ---------------------------------------------------------------- what Perl still serves
+
+def step_aside(session, p, gates=()):
+    """Hand the request to Perl (NotPorted) when the site configuration or
+    the request uses something this port does not implement. Called first by
+    every entry point, before any check or write."""
+    if any(_truthy(param(name)) for name in SITE_GATES) or int(param("maxlocalattachment", 0) or 0) > 0:
+        raise NotPorted("site parameter")
+    f = t.fielddefs
+    if session.execute(select(f.c.id).where(f.c.custom == 1).limit(1)).first():
+        raise NotPorted("custom fields")
+    for name in (*REQUEST_GATES, *gates):
+        if name in p:
+            raise NotPorted(name)
+    if any(str(key).startswith("cf_") for key in p):
+        raise NotPorted("custom field")
+    if any("." in str(field) for key in ("include_fields", "exclude_fields") for field in as_list(p.get(key))):
+        raise NotPorted("nested field selector")
+
+
+def _step_aside_for_write(session, user, product_id, status_change=False):
+    """Writes Perl gates on things this port does not model."""
+    gcm, w = t.group_control_map, t.status_workflow
+    if session.execute(select(gcm.c.group_id).where(gcm.c.product_id == product_id, gcm.c.canedit != 0)).first():
+        raise NotPorted("product edit groups")
+    if status_change and session.execute(select(w.c.new_status).where(w.c.require_comment != 0)).first():
+        raise NotPorted("workflow comment requirement")
 
 
 # ---------------------------------------------------------------- lookups
@@ -141,7 +180,8 @@ def check_bug(session, user, raw):
     if bug is None:
         raise BugzillaError(101, f"Bug #{bug_id} does not exist.")
     if not _can_see(session, user, bug):
-        raise BugzillaError(102, f"You are not authorized to access bug #{bug_id}." + (
+        # Perl names the bug the way the client did, so an alias does not reveal the id.
+        raise BugzillaError(102, f"You are not authorized to access bug #{raw}." + (
             "" if user.id else " To see this bug, you must first log in to an account with the appropriate permissions."))
     return bug
 
@@ -240,6 +280,7 @@ def bug_to_hash(session, user, bug, filt, client_ip=""):
 # ---------------------------------------------------------------- get / search
 
 def get(session, user, raw_id, params, client_ip=""):
+    step_aside(session, params)
     bug = check_bug(session, user, raw_id)
     return {"bugs": [bug_to_hash(session, user, bug, FieldFilter(params), client_ip)], "faults": []}
 
@@ -270,6 +311,10 @@ def _like_all_words(column, values):
 def search(session, user, params, client_ip=""):
     b = t.bugs
     where = [_visible(user)]
+    step_aside(session, params)
+    if set(params) - SEARCH_PARAMS:
+        # Perl ignores unknown parameters but acts on many this port does not know.
+        raise NotPorted("search parameter")
     given = lambda name: as_list(params.get(name)) if params.get(name) not in (None, "") else None
 
     if params.get("offset") not in (None, "") and params.get("limit") in (None, ""):
@@ -419,7 +464,10 @@ def _check_dependency_loop(session, depends_on, blocks):
 # ---------------------------------------------------------------- create
 
 def create(session, user, p):
+    step_aside(session, p, CREATE_GATES)
     require_login(user)
+    if not user.in_group("editbugs") and (p.get("depends_on") or p.get("blocks")):
+        raise NotPorted("dependencies set by a user without editbugs")
     b = t.bugs
     prod, comp = t.products, t.components
 
@@ -451,6 +499,9 @@ def create(session, user, p):
         "bug_severity": _select_value(session, "bug_severity", p.get("severity", param("defaultseverity"))),
     }
     status = _initial_status(session, user, product, p.get("status"))
+    _step_aside_for_write(session, user, product.id, status_change=True)
+    if not _is_open(session, status):
+        raise NotPorted("bug filed as closed")
     milestone = product.defaultmilestone
     if p.get("target_milestone") not in (None, "") and editbugs:
         milestone = _in_product(session, t.milestones, "value", p["target_milestone"], product, "milestone").value
@@ -481,7 +532,6 @@ def create(session, user, p):
         bug_status=status, resolution="", everconfirmed=0 if status == "UNCONFIRMED" else 1,
         target_milestone=milestone, assigned_to=assignee, qa_contact=qa_contact, reporter=user.id,
         bug_file_loc=str(p.get("url") or ""), status_whiteboard=str(p.get("whiteboard") or ""),
-        estimated_time=float(p.get("estimated_time") or 0) if user.is_timetracker else 0,
         creation_ts=now, delta_ts=now, **values)).inserted_primary_key[0]
     for group_id in groups:
         session.execute(insert(t.bug_group_map).values(bug_id=bug_id, group_id=group_id))
@@ -576,14 +626,16 @@ SELECTS = {"priority": "priority", "severity": "bug_severity", "op_sys": "op_sys
 
 
 def update_bugs(session, user, raw_id, p):
+    step_aside(session, p, UPDATE_GATES)
     require_login(user)
-    # An "ids" parameter replaces the id in the path, as in Perl.
-    raws = as_list(p.get("ids")) or [raw_id]
-    bugs = [check_bug(session, user, raw) for raw in raws]
-    for field in NOT_PORTED:
-        if field in p:
-            # Perl still serves updates that touch these fields.
-            raise NotPorted(field)
+    if not user.in_group("editbugs"):
+        # Perl decides field by field what a reporter, assignee or other user may change.
+        raise NotPorted("update by a user without editbugs")
+    if str(p.get("resolution") or "") == "DUPLICATE" and p.get("dupe_of") in (None, ""):
+        raise NotPorted("DUPLICATE without a target")
+    bugs = [check_bug(session, user, raw_id)]
+    for bug in bugs:
+        _step_aside_for_write(session, user, bug.product_id, status_change="status" in p or "dupe_of" in p)
     now = db_now(session)
     results = []
     for bug in bugs:
@@ -594,12 +646,6 @@ def update_bugs(session, user, raw_id, p):
                         "last_change_time": iso(delta), "changes": changes})
     session.commit()
     return {"bugs": results}
-
-
-def _may_edit(session, user, bug):
-    """check_can_change_field, reduced to its main rule: editbugs, or a role on the bug."""
-    return (user.in_group("editbugs") or user.id in (bug.assigned_to, bug.reporter)
-            or (bug.qa_contact and bug.qa_contact == user.id))
 
 
 def _set_changes(spec):
@@ -639,6 +685,10 @@ def _update_one(session, user, bug, p, now):
     if "component" in p:
         comp = t.components
         found = _in_product(session, comp, "name", p["component"], product, "component")
+        ccc = t.component_cc
+        if found.id != bug.component_id and session.execute(
+                select(ccc.c.user_id).where(ccc.c.component_id == found.id)).first():
+            raise NotPorted("component with default CC")
         if found.id != bug.component_id:
             old_name = session.execute(select(comp.c.name).where(comp.c.id == bug.component_id)).scalar_one()
             change("component_id", found.id, "component", (old_name, found.name))
@@ -694,8 +744,11 @@ def _update_one(session, user, bug, p, now):
             if "status" not in p and resolution != "DUPLICATE":
                 p = dict(p, status=param("duplicate_or_move_bug_status", "RESOLVED"))
             wanted_resolution = "DUPLICATE"
-            if target.reporter != bug.reporter and not session.execute(
-                    select(cc.c.who).where(cc.c.bug_id == target.bug_id, cc.c.who == bug.reporter)).first():
+            # The reporter is copied to the target only if they may see it.
+            reporter_user = load_user(session, bug.reporter)
+            if (target.reporter != bug.reporter and reporter_user and _can_see(session, reporter_user, target)
+                    and not session.execute(select(cc.c.who).where(
+                        cc.c.bug_id == target.bug_id, cc.c.who == bug.reporter)).first()):
                 reporter = _users(session, [bug.reporter])[bug.reporter].login_name
                 session.execute(insert(cc).values(bug_id=target.bug_id, who=bug.reporter))
                 other_activity.append((target.bug_id, "cc", "", reporter))
@@ -784,10 +837,6 @@ def _update_one(session, user, bug, p, now):
         if added or removed:
             activity.append((field, ", ".join(map(str, removed)), ", ".join(map(str, added))))
 
-    if (activity or new) and not _may_edit(session, user, bug):
-        raise BugzillaError(115, "You tried to change a field of this bug, but only the assignee or reporter "
-                                 "of the bug, or a user with the required permissions may change that field.")
-
     # Write.
     if new_dupe != old_dupe:
         session.execute(delete(dup).where(dup.c.dupe == bug_id))
@@ -861,6 +910,7 @@ def _bug_comments(session, bug_id):
 
 
 def comments(session, user, params, bug_ids=(), comment_ids=()):
+    step_aside(session, params)
     filt = FieldFilter(params)
     since = parse_datetime(params["new_since"]) if params.get("new_since") not in (None, "") else None
     bugs = {}
@@ -890,12 +940,15 @@ def comments(session, user, params, bug_ids=(), comment_ids=()):
 
 
 def add_comment(session, user, raw_id, p):
+    step_aside(session, p, ("work_time",))
     require_login(user)
     if p.get("comment") is None or str(p["comment"]).strip() == "":
         raise param_required("comment")
     bug = check_bug(session, user, raw_id)
     text = _clean_comment(p["comment"])
-    private = _private(user, p.get("is_private"))
+    _step_aside_for_write(session, user, bug.product_id)
+    # "private" is the older name of is_private; Perl accepts both.
+    private = _private(user, p.get("is_private", p.get("private")))
     now = db_now(session)
     comment_id = _add_comment(session, bug.bug_id, user.id, now, text, private=private)
     b = t.bugs
@@ -908,6 +961,7 @@ def add_comment(session, user, raw_id, p):
 # ---------------------------------------------------------------- history
 
 def history(session, user, raw_ids, params):
+    step_aside(session, params)
     since = parse_datetime(params["new_since"]) if params.get("new_since") not in (None, "") else None
     act, f, p, att = t.bugs_activity, t.fielddefs, t.profiles, t.attachments
     out = []
@@ -921,6 +975,8 @@ def history(session, user, raw_ids, params):
             query = query.where(act.c.bug_when > since)
         if not user.is_insider:
             query = query.where(func.coalesce(att.c.isprivate, 0) == 0)
+        if not user.is_timetracker:
+            query = query.where(not_(f.c.name.in_(TIMETRACKING_FIELDS)))
         entries = []
         for row in session.execute(query):
             if not entries or (entries[-1]["when"], entries[-1]["who"]) != (iso(row.bug_when), row.login_name):
@@ -964,6 +1020,7 @@ def _attachment_query():
 
 
 def attachments(session, user, params, bug_ids=(), attachment_ids=()):
+    step_aside(session, params)
     filt = FieldFilter(params)
     a = t.attachments
     visible = lambda row: not row.isprivate or user.is_insider or row.submitter_id == user.id
@@ -990,11 +1047,13 @@ def attachments(session, user, params, bug_ids=(), attachment_ids=()):
 
 
 def add_attachment(session, user, raw_id, p):
+    step_aside(session, p, ("flags",))
     require_login(user)
     if p.get("data") is None:
         raise param_required("data")
-    raws = as_list(p.get("ids")) or [raw_id]
-    bugs = [check_bug(session, user, raw) for raw in raws]
+    bugs = [check_bug(session, user, raw_id)]
+    for bug in bugs:
+        _step_aside_for_write(session, user, bug.product_id)
 
     summary = " ".join(str(p.get("summary") or "").split())
     if not summary:

@@ -14,6 +14,9 @@ from .core.fallback import NotPorted, forward_to_perl
 
 # Apache proxies the original path, so accept it with or without the prefix.
 PREFIXES = ("/rest.cgi", "/rest")
+# Sent by Perl on every REST response (Bugzilla/WebService/Server/REST.pm).
+CORS = [(b"access-control-allow-origin", b"*"),
+        (b"access-control-allow-headers", b"origin, content-type, accept, x-requested-with")]
 
 
 class StripRestPrefix:
@@ -32,7 +35,7 @@ class StripRestPrefix:
             async def send_with_backend(message):
                 if message["type"] == "http.response.start" and not any(
                         k == b"x-bugzilla-backend" for k, _ in message.get("headers", [])):
-                    message["headers"] = [*message["headers"], (b"x-bugzilla-backend", b"python")]
+                    message["headers"] = [*message["headers"], (b"x-bugzilla-backend", b"python"), *CORS]
                 await send(message)
             return await self.app(scope, receive, send_with_backend)
         return await self.app(scope, receive, send)

@@ -40,7 +40,8 @@ services:
     volumes:
       - bugzilla5-data-dir:/var/www/html/data:ro
     ports:
-      - 8000:8000
+      # Loopback only: clients use Apache on :8080; this port is for the parity suite.
+      - 127.0.0.1:8000:8000
     depends_on:
       - bugzilla5.db
     environment:

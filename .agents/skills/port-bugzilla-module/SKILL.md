@@ -110,8 +110,10 @@ parity/test_<module>*.py  # contract tests, run against both backends
 Routing and requests
 - `/rest.cgi/bug*` as a prefix also matches `/rest.cgi/bug_user_last_visit`. Anchor the rule:
   `^/rest(?:\.cgi)?/(bug(?:/.*)?)$`.
-- Query parameters override JSON body values on POST/PUT, and a body `ids` replaces the id in the
-  path (`PUT /bug/1` with `{"ids": [2]}` updates only bug 2).
+- Query parameters override JSON body values on POST/PUT. A body `ids` replaces the id in the
+  path (`PUT /bug/1` with `{"ids": [2]}` updates only bug 2), while a query `ids` is merged with
+  it; the Bug port leaves every request with `ids` to Perl.
+- Perl sends `Access-Control-Allow-Origin: *` on REST responses; `main.py` adds it for Python.
 - Success status differs per route: `POST /bug` is 200, `POST /bug/{id}/comment` and
   `/attachment` are 201.
 - Unknown paths and methods are 404 with code 32614 and the message
@@ -173,10 +175,17 @@ Perl through `app/core/fallback.py`:
 
 - A path or method no router declares is forwarded to Perl as is (for Bug: comment tags,
   `PUT /bug/attachment/{id}`, `GET /bug/`).
-- A request the service recognises but cannot serve yet raises `NotPorted`, before any write, and
-  is forwarded the same way (for Bug: `PUT /bug/{id}` with `product`, `groups`, `keywords`,
-  `see_also`, `flags`, `alias`, `reset_assigned_to`, `reset_qa_contact`, `comment_is_private` or
-  `work_time`).
+- A request the service recognises but cannot serve yet raises `NotPorted`, before any check or
+  write, and is forwarded the same way. Every entry point of a service starts with a
+  `step_aside(...)` call that lists these cases. For Bug: site parameters the port does not
+  implement (`requirelogin`, `webservice_email_filter`, `strict_isolation`, `ssl_redirect`,
+  `noresolveonopenblockers`, `maxlocalattachment`), custom fields, an `ids` parameter,
+  `login`/`password` on a non-login route, nested field selectors, search parameters outside the
+  ported list, updates by users without `editbugs`, products with edit groups, workflow
+  transitions that require a comment, and writes that set groups, keywords, see_also, flags,
+  alias, product or time tracking.
+- Permission and visibility rules are the first thing to step aside for. A simplified copy of a
+  Perl permission check is a security bug, not a parity gap.
 - Never ignore a parameter Perl acts on, and never invent an error for it. Forward it.
 - List what is forwarded in the PR description, and add a parity test for at least one forwarded
   case so the hand-off itself is covered.
