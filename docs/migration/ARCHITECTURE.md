@@ -250,8 +250,9 @@ Details worth preserving in Python:
   is present, skip auth; otherwise call `Bugzilla->login()` which authenticates if credentials are
   present and otherwise leaves the request anonymous (`LOGIN_OPTIONAL`). Methods that need a user
   call `Bugzilla->login(LOGIN_REQUIRED)` themselves (e.g. `Bug.create`), producing error 410 (`login_required`) → HTTP 401.
-  `login`/`password` in the query string are only honoured on `GET /login`; for other methods they
-  must be in the JSON body or you must use `token`/`api_key` (cross-domain protection).
+  `login`/`password` are honoured on every REST call in the query string, and in the JSON body of
+  non-GET calls (GET bodies are never decoded, see `REST.pm::_retrieve_json_params`; REST
+  renames them to `Bugzilla_login`/`Bugzilla_password`); the parity suite pins this on `POST /bug`.
 * **Token format**: `GET /login` returns `{"id": <userid>, "token": "<userid>-<logincookie>"}`.
   `Auth::Login::Cookie::login_token` splits it and validates against `logincookies` exactly like
   the browser cookie pair; `GET /logout` deletes the row. Max age 30 days (`MAX_LOGINCOOKIE_AGE`).
