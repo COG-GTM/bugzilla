@@ -173,6 +173,8 @@ Common to every authenticated request (not repeated below):
 
 - R `profiles`, `groups`, `user_group_map`, `group_group_map` (user and group membership).
 - W `logincookies` (`lastused` is updated when a token is validated).
+- W `profiles.last_seen_date`: set on login when it is missing or not today's date (shown in
+  `editusers.cgi`).
 - The trace also showed a statement against `tokens` on `GET /login` and `POST /user`; the code path
   was not identified (token validation itself reads only `logincookies`).
 - Bug-level access checks add R `bugs`, `bug_group_map`, `cc`.
@@ -286,9 +288,10 @@ sequenceDiagram
   R->>D: DELETE logincookies row
 ```
 
-Relevant limits in `Bugzilla/Constants.pm`: login cookies expire after 30 days unused
-(`MAX_LOGINCOOKIE_AGE`), tokens after 3 days (`MAX_TOKEN_AGE`), and an account is locked for 30
-minutes after 5 failed logins (`MAX_LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_INTERVAL`).
+Relevant limits in `Bugzilla/Constants.pm`: login cookies unused for 30 days (`MAX_LOGINCOOKIE_AGE`)
+are deleted the next time any login is persisted; validation itself does not check the age, so an
+old row is accepted for as long as it exists. Tokens expire after 3 days (`MAX_TOKEN_AGE`), and an
+account is locked for 30 minutes after 5 failed logins (`MAX_LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_INTERVAL`).
 
 `Bugzilla->login` also handles `sudo` impersonation (cookie `sudo`, groups `bz_sudoers` and
 `bz_sudo_protect`) and the `requirelogin` parameter.
@@ -296,7 +299,9 @@ minutes after 5 failed logins (`MAX_LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_INTERVAL`).
 ### 5.3 Authorisation
 
 - Bug visibility: `bug_group_map` against the user's groups (`user_group_map` expanded through
-  `group_group_map`), with exceptions for reporter, assignee, QA contact and CC members.
+  `group_group_map`), with exceptions for the assignee, the reporter (only if `reporter_accessible`), CC members (only
+  if `cclist_accessible`) and the QA contact (only if the `useqacontact` parameter is on). Search
+  applies the same gates.
 - Product access: `group_control_map` (entry, canedit, editcomponents, editbugs, canconfirm).
 - Admin endpoints check named groups: `editcomponents`, `creategroups`, `editusers`, `admin`.
 
@@ -370,6 +375,8 @@ contract tests rather than trusting this table. Methods that exist only on JSON-
 - Success: JSON object; shape is specific to each method. Exception (static reading):
   `BugUserLastVisit.update` and `.get` return a bare JSON array, which REST passes through unwrapped.
 - Error: `{"error": true, "code": <int>, "message": "...", "documentation": "..."}`.
+- Other representations: with `Accept: text/html` REST renders the result as an HTML page, and
+  with a `callback` parameter the body is wrapped as JSONP. The parity suite covers JSON only.
 - HTTP status comes from `REST_STATUS_CODE_MAP` in `Bugzilla/WebService/Constants.pm`: codes 51, 101
   and 32614 map to 404; the authorisation codes (102, 106, 109, 110, 113, 115, 120, 300-304, 410,
   504, 505) map to 401; everything else maps to 400.

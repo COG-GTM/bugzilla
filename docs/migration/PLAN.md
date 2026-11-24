@@ -94,8 +94,10 @@ Risk notes:
   activity logging, and every change sends mail. This is the largest and last unit.
 - **User (8)**: login, lockout and password hashing are security sensitive; a mismatch locks users
   out or lets them in.
-- **Mail and hooks**: every write endpoint in Perl touches mail (`mail_staging`, `BugMail`) and fires
-  extension hooks. See open decisions 1 and 2.
+- **Mail and hooks**: bug writes send mail through `BugMail` and every write fires extension hooks.
+  A statement against `mail_staging` is not evidence of a notification: every commit drains that
+  table even when it is empty, and some writes (for example `User.create`) send no mail at all.
+  See open decisions 1 and 2.
 
 ### 3.1 Order
 
@@ -142,6 +144,9 @@ and highest-risk slice, so it tests the approach early, at the cost of a slower 
   `ProxyPass /rest.cgi/version http://bugzilla5.api:8000/rest.cgi/version`.
 - Rules are per path prefix and, where a module is split (Bug read vs write), per method using
   `RewriteCond %{REQUEST_METHOD}` with the `[P]` flag.
+- A path-prefix rule sends every method to Python, including ones the module did not list. Perl
+  answers `OPTIONS` on a known path with an `Allow` header, so a module either reproduces that or
+  its rule is restricted to the methods it ported.
 - The repository `.htaccess` also rewrites `/rest/...` to `rest.cgi/...`; the proxy rules must cover
   both spellings.
 - Python serves under the same `/rest.cgi/` prefix so the tests need only a base URL.
@@ -169,7 +174,7 @@ Values that legitimately differ between two runs are normalised before compariso
 | Timestamps (`creation_time`, `last_change_time`, comment `time`) | Assert format. For records the test just wrote: not before the write started. For seeded records in the differential runner: compared exactly, since both implementations read the same row. |
 | Generated ids on create | Assert type, then fetch the record and compare it. |
 | Login tokens | Assert format `<user_id>-<token>`. |
-| Bug `update_token` | Replaced by a placeholder: it embeds its issue time. |
+| Bug `update_token` | Replaced by a placeholder: it embeds its issue time. The placeholder also hides the signature, so compatibility is checked separately: a token issued by Python must be accepted by `process_bug.cgi`. |
 | `GET /time` values | Assert format only. |
 | Error `message` text | Compared exactly; a difference is a failure unless listed as an accepted deviation. |
 | Key order | Ignored (JSON objects). Array order is compared. |
